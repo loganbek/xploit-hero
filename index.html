@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v15</title>
+<title>XPLOIT HERO — POC v17</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: #020805; color: #00ff88; font-family: ui-monospace, Menlo, Consolas, monospace; }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v15 // crate physics fix</div>
+  <div id="sub">POC v17 // Ghost Trail arc</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -73,7 +73,7 @@
       <p><b>WORLD:</b> shove crates around, smash barrels, crack data nodes for loot.</p>
       <p><b>WEAPONS:</b> tiers shoot differently now — check the label for damage, speed, and style.</p>
       <p><b>ANALYTICS:</b> your play is tracked locally — open STATS below the bench. Nothing leaves this device.</p>
-      <p><b>STORY NODES:</b> stages ending in 5 hide a sector mainframe — clear the daemons, walk to it, get FUSE's briefing, then jack in when you're ready.</p>
+      <p id="introNodes"><b>CASE FILE 01 // GHOST TRAIL:</b> Vex went dark. Stages ending in 5 hide a sector mainframe — clear the daemons, walk to it, get FUSE's briefing, then jack in when you're ready.</p>
       <p><b>YOUR HANDLE:</b> <input id="handleInput" type="text" maxlength="12" placeholder="pick your hacker name" style="background:#020a06;color:#00ff88;border:1px solid #00ff88;border-radius:6px;padding:6px;font-family:monospace;"></p>
       <button id="startBtn">TAP TO JACK IN</button>
     </div>
@@ -120,7 +120,7 @@
 </div>
 <script>
 'use strict';
-// ---------- XPLOIT HERO POC v15 ----------
+// ---------- XPLOIT HERO POC v17 ----------
 // Third-person auto-battler with movement, XP-Hero-style:
 // player steers (drag / WASD / arrows), rig auto-fires at nearest foe.
 // Start: level 0 NOOB -> climb to ELITE HAXZOR. Boss every 10 stages.
@@ -200,7 +200,8 @@ function blankState() {
     stage: 1, kills: 0, level: 0, data: 0, crypto: 0,
     heroHp: 60, maxHp: 60, baseAtk: 6, handle: 'NOOB',
     items: [], nextItemId: 1, autoMerge: true,
-    injectReadyAt: 0, healReadyAt: 0
+    injectReadyAt: 0, healReadyAt: 0,
+    arcStep: 0, nodeIdx: 0, ghostDone: false
   };
 }
 function rankFor(level) {
@@ -211,6 +212,7 @@ function rankFor(level) {
 var S = load() || blankState();
 document.getElementById('handleInput').value = S.handle || 'NOOB';
 document.getElementById('handleInput2').value = S.handle || 'NOOB';
+if (S.ghostDone) document.getElementById('introNodes').innerHTML = '<b>GHOST TRAIL // SOLVED:</b> Vex is safe. Stages ending in 5 hide a sector mainframe — clear the daemons, walk to it, get FUSE\'s briefing, then jack in when you\'re ready.';
 function handle() { return (S.handle || 'NOOB'); }
 function termPrompt() { return handle().toLowerCase() + '@mainframe:~$'; }
 function setHandle(v, silent) {
@@ -267,7 +269,12 @@ function spawnWorld() {
   for (var i = 0; i < nCrates; i++) { var s = spot(70); if (s) world.push({ kind: 'crate', x: s.x, y: s.y, w: 24, h: 24 }); }
   for (var j = 0; j < nBarrels; j++) { var s2 = spot(60); if (s2) world.push({ kind: 'barrel', x: s2.x, y: s2.y, r: 11 }); }
   for (var k = 0; k < nNodes; k++) { var s3 = spot(70); if (s3) world.push({ kind: 'node', x: s3.x, y: s3.y, r: 13 }); }
-  if (S.stage % 10 === 5) { var s4 = spot(90); if (s4) world.push({ kind: 'server', x: s4.x, y: s4.y, r: 26 }); }
+  if (S.stage % 10 === 5) {
+    var s4 = spot(90) || spot(60) || spot(40);
+    if (!s4) { var corners = [{ x: 70, y: 70 }, { x: arenaW() - 70, y: 70 }, { x: 70, y: arenaH() - 70 }, { x: arenaW() - 70, y: arenaH() - 70 }]; for (var ci = 0; ci < corners.length; ci++) { if (Math.sqrt((corners[ci].x - hero.x) * (corners[ci].x - hero.x) + (corners[ci].y - hero.y) * (corners[ci].y - hero.y)) > 60) { s4 = corners[ci]; break; } } }
+    if (!s4) s4 = { x: arenaW() / 2, y: 70 };
+    world.push({ kind: 'server', x: s4.x, y: s4.y, r: 26 });
+  }
 }
 var pickups = [];
 var bursts = [];
@@ -462,7 +469,7 @@ function onKill(e) {
     else log('SECTOR ' + S.stage + ' CLEARED // +' + bonusC + ' crypto, hull restored — next sector in 5s, breathe, patch up!');
     pendingStage = S.stage + 1;
     intermissionUntil = Date.now() + 5000;
-    if (S.stage % 10 === 5) { intermissionUntil = 0; nodePending = true; }
+    if (S.stage % 10 === 5) { intermissionUntil = 0; nodePending = true; if (!world.some(function (o) { return o.kind === 'server'; })) { world.push({ kind: 'server', x: arenaW() / 2, y: 70, r: 26 }); log('MAINFRAME // signal relocated — walk to it'); } }
     AN.totals.stagesCleared += 1;
     AN.totals.bestStage = Math.max(AN.totals.bestStage, S.stage);
     if (e.boss) AN.funnel.firstBoss = true;
@@ -610,6 +617,65 @@ var STORY_NODES = [
   }
 ];
 var nodeCurrent = null, nodeDone = null, nodePending = false;
+var nodeRewarded = false;
+// ---------- CASE FILE 01 // GHOST TRAIL ----------
+// The first story arc: 4 beats in order, then the general nodes cycle.
+// arcStep advances only on a completed beat (never on SKIP or JACK OUT),
+// so the mystery always plays in order. General nodes advance nodeIdx.
+var GHOST_NODES = [
+  {
+    arc: 'ghost', beat: 1,
+    title: 'GHOST TRAIL // THE PHOTO',
+    obj: 'OBJECTIVE: read the photo metadata and find where it was taken.',
+    brief: 'Vex went dark an hour ago. Last thing they sent was a photo and the words "don\'t follow me." We\'re following anyway. This box holds the message and the photo — pull the photo\'s metadata and find where it was taken.',
+    files: { 'note.txt': 'Vex: don\'t follow me. — V', 'photo.jpg': '(binary image data — the story is in the metadata. try exiftool.)' },
+    steps: [
+      { pattern: /^ls$/, hint: 'list the files — try: ls', out: null },
+      { pattern: /^cat note\.txt$/, hint: 'read Vex\'s note — try: cat note.txt', out: 'NOTE // "don\'t follow me." — V. Too late.' },
+      { pattern: /^exiftool photo\.jpg$/, hint: 'read the photo metadata — try: exiftool photo.jpg', out: 'EXIF // GPS 37.7749, -122.4194 — an old relay station outside the city. Camera serial VX-0117. Vex was here.' }
+    ],
+    lesson: 'Photos carry metadata: location, device, time. EXIF is the first thing an OSINT hunter reads.'
+  },
+  {
+    arc: 'ghost', beat: 2,
+    title: 'GHOST TRAIL // THE HANDLE',
+    obj: 'OBJECTIVE: trace the handle VEXVOID across the forums and the domain record.',
+    brief: 'The relay station was empty, but Vex left a handle behind: VEXVOID. Same handle, everywhere, for years. This box holds their forum trail and a domain record — follow the handle and see what it connects.',
+    files: { 'forums.txt': 'VEXVOID @ dead-forum: "relay station is hot, moving on" // VEXVOID @ old-board: "my site is vexvoid.dev, come find me" // VEXVOID @ chat-log: "same password everywhere, what could go wrong"' },
+    steps: [
+      { pattern: /^ls$/, hint: 'list the files — try: ls', out: null },
+      { pattern: /^cat forums\.txt$/, hint: 'read the forum trail — try: cat forums.txt', out: 'FORUMS // same handle everywhere. And a domain: vexvoid.dev.' },
+      { pattern: /^whois vexvoid\.dev$/, hint: 'look up the domain — try: whois vexvoid.dev', out: 'WHOIS // vexvoid.dev — registered 2021, recovery email vex@oldmail.example, last renewed from the relay station IP. Vex owns this domain.' }
+    ],
+    lesson: 'Handles are identities. One reused username links every place a person has ever been. WHOIS links a domain to its owner.'
+  },
+  {
+    arc: 'ghost', beat: 3,
+    title: 'GHOST TRAIL // THE LEAK',
+    obj: 'OBJECTIVE: find Vex\'s server address inside the leaked config dump.',
+    brief: 'Vex\'s domain pointed at a paste site, and the paste holds a config dump. Somewhere in it is a server address Vex used. Dig it out — and notice what else got leaked with it.',
+    files: { 'dump.txt': 'PASTE #4471 // config dump: db_host = 10.4.2.9 // api_key = LIVE_KEY_DO_NOT_SHARE (leaked!) // backup_server = 203.0.113.77 // VEX private relay // admin_pass = hunter2 (yes, really)' },
+    steps: [
+      { pattern: /^ls$/, hint: 'list the files — try: ls', out: null },
+      { pattern: /^cat dump\.txt$/, hint: 'read the dump — try: cat dump.txt', out: 'DUMP // an API key, a password, and a backup server address, all public. Leaks never expose just one secret.' },
+      { pattern: /^grep .+ dump\.txt$/, hint: 'pull the server line — try: grep relay dump.txt', out: 'MATCH // backup_server = 203.0.113.77 — Vex\'s private relay. That\'s where they went.' }
+    ],
+    lesson: 'Pastes and dumps leak more than the target secret. grep pulls one line out of a haystack.'
+  },
+  {
+    arc: 'ghost', beat: 4,
+    title: 'GHOST TRAIL // THE DEAD-DROP',
+    obj: 'OBJECTIVE: read the trail log, then run the wipe script.',
+    brief: 'The relay at 203.0.113.77 is Vex\'s dead-drop. They left a trail log and a wipe script. Read the log, then wipe the trail so nobody else can follow it — Vex is counting on you.',
+    files: { 'trail.log': 'VEX TRAIL // hops: city → relay station → dead-drop. Last entry: "if you\'re reading this, I\'m already gone. wipe it."', 'wipe.sh': '#!/bin/sh // shred trail.log — burn the trail' },
+    steps: [
+      { pattern: /^ls$/, hint: 'list the files — try: ls', out: null },
+      { pattern: /^cat trail\.log$/, hint: 'read the trail — try: cat trail.log', out: 'TRAIL // Vex is gone, but safe. They left this for you to finish.' },
+      { pattern: /^\.\/wipe\.sh$/, hint: 'burn the trail — try: ./wipe.sh', out: 'TRAIL WIPED // no one can follow Vex now. Case closed.' }
+    ],
+    lesson: 'A dead-drop is only safe if the trail dies with it. Wiping is the last step of the job.'
+  }
+];
 var briefingOpen = false, termOpen = false;
 function openBriefing(stage) {
   nodeCurrent = nodeFor(stage);
@@ -635,10 +701,14 @@ document.getElementById('briefSkipBtn').onclick = function () {
   intermissionUntil = Date.now() + 2000;
   log('mainframe skipped — next sector');
 };
-function nodeFor(stage) { return STORY_NODES[((stage - 5) / 10) % STORY_NODES.length]; }
+function nodeFor(stage) {
+  if (S.arcStep < GHOST_NODES.length) return GHOST_NODES[S.arcStep];
+  return STORY_NODES[S.nodeIdx % STORY_NODES.length];
+}
 function openNode(stage) {
   nodeCurrent = nodeFor(stage);
   nodeDone = {};
+  nodeRewarded = false;
   termOpen = true;
   document.getElementById('termTitle').textContent = 'MAINFRAME UPLINK // ' + nodeCurrent.title;
   document.getElementById('termObj').textContent = nodeCurrent.obj;
@@ -702,14 +772,29 @@ function termSubmit() {
   });
   var allDone = nodeCurrent.steps.every(function (st, i) { return nodeDone[i]; });
   if (allDone) {
-    termPrint('FUSE // ' + nodeCurrent.lesson);
-    termPrint('NODE BREACHED // +75 crypto +60 data. Hit CONTINUE to keep pushing.');
-    S.crypto += 75;
-    AN.totals.nodesBreached += 1;
-    gainData(60);
-    ding();
-    log('STORY NODE // ' + nodeCurrent.title + ' breached — +75 crypto +60 data');
-    document.getElementById('termCloseBtn').textContent = 'CONTINUE';
+    if (!nodeRewarded) {
+      nodeRewarded = true;
+      termPrint('FUSE // ' + nodeCurrent.lesson);
+      termPrint('NODE BREACHED // +75 crypto +60 data. Hit CONTINUE to keep pushing.');
+      S.crypto += 75;
+      AN.totals.nodesBreached += 1;
+      gainData(60);
+      ding();
+      log('STORY NODE // ' + nodeCurrent.title + ' breached — +75 crypto +60 data');
+      if (nodeCurrent.arc === 'ghost') {
+        S.arcStep += 1;
+        log('GHOST TRAIL // beat ' + nodeCurrent.beat + ' of 4 cleared');
+        if (S.arcStep >= GHOST_NODES.length) {
+          S.ghostDone = true;
+          log('GHOST TRAIL // CASE CLOSED — Vex is safe');
+        }
+        save();
+      } else {
+        S.nodeIdx += 1;
+        save();
+      }
+      document.getElementById('termCloseBtn').textContent = 'CONTINUE';
+    }
     termHint();
     return;
   }
@@ -959,9 +1044,9 @@ function draw() {
       ctx.fillStyle = '#fdba74';
       ctx.beginPath(); ctx.arc(o.x - 3, o.y - 3, 4, 0, Math.PI * 2); ctx.fill();
     } else if (o.kind === 'server') {
-      ctx.fillStyle = '#0f172a';
+      ctx.fillStyle = '#1e293b';
       ctx.fillRect(o.x - 22, o.y - 28, 44, 56);
-      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
+      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 3;
       ctx.strokeRect(o.x - 22, o.y - 28, 44, 56);
       ctx.lineWidth = 1;
       for (var li = 0; li < 4; li++) {
@@ -969,7 +1054,7 @@ function draw() {
         ctx.fillRect(o.x - 16, o.y - 20 + li * 12, 32, 4);
       }
       ctx.fillStyle = '#00e5ff';
-      ctx.font = 'bold 9px monospace';
+      ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.fillText('MAINFRAME', o.x, o.y - 34);
       if (nodePending) {
@@ -1326,7 +1411,7 @@ function update(dt, ts) {
       }
     }
   });
-  // crate slide: a shoved crate glides a touch, then settles (blocked by walls + crates)
+  // crate slide: a shoved crate glides a touch, then settles (blocked by walls + crates + the hero)
   world.forEach(function (o) {
     if (o.kind !== 'crate' || (!o.vx && !o.vy)) return;
     var sx = o.x + o.vx * dt, sy = o.y + o.vy * dt;
@@ -1334,6 +1419,7 @@ function update(dt, ts) {
     world.forEach(function (o2) {
       if (o2 !== o && o2.kind === 'crate' && Math.abs(sx - o2.x) < (o.w + o2.w) / 2 && Math.abs(sy - o2.y) < (o.h + o2.h) / 2) blocked2 = true;
     });
+    if (circleRect(hero.x, hero.y, hero.r, sx, sy, o.w, o.h)) { blocked2 = true; o.vx = 0; o.vy = 0; }
     if (!blocked2) { o.x = sx; o.y = sy; }
     var sdec = Math.exp(-8 * dt);
     o.vx *= sdec; o.vy *= sdec;

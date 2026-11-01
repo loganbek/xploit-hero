@@ -26,6 +26,17 @@ account, no server. Your progress saves in the browser's local storage.
 `index.html` is always the latest build. Version history lives in the
 `xploit-hero-poc-vN.html` files in the project workspace.
 
+## Roadmap
+
+- Next (v17, bugfix): a mainframe that always spawns on stages ending in
+  5 (no more getting stuck after clearing the wave), smoother crate
+  physics, and a brighter mainframe that's easier to spot.
+- Then: more Ghost Trail polish, then the Perimeter recon arc — the corp
+  from Ghost Trail becomes your next client.
+- Later: Phish Tank (SOC desk defense), Hackazon (web-app bounty),
+  Chain Reaction (DeFi audit), and a history campaign from the early
+  internet to today.
+
 ## Notes
 
 - Fun first: this is a game, not an income scheme. No crypto, no payouts,
