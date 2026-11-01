@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v21d</title>
+<title>XPLOIT HERO — POC v21</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v21d // 70-tier ladder — crafting caps, paragon, prestige</div>
+  <div id="sub">POC v21 // 70-tier ladder — inventory + rank-up ding</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -95,7 +95,7 @@
   </div>
   <div id="objective">GOAL: <b id="objText">jack in to start</b></div>
   <div class="panel">
-    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span><span>VER <b id="verLabel">v21c</b></span></div>
+    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span><span>VER <b id="verLabel">v21</b></span></div>
     <div class="row"><span>ATK <b id="atk">6</b> <span class="dim" id="atkBreak"></span></span><span>ARMOR <b id="armor">0</b></span></div>
     <div class="row"><span>DATA <b id="data">0</b>/<span id="dataNext">30</span></span><span>CRYPTO <b id="crypto" class="cyan">0</b></span></div>
     <div class="row"><span>HP <b id="heroHp">60/60</b></span><span>FOES <b id="foeCount">0</b></span></div>
@@ -111,6 +111,10 @@
     <div id="bench"></div>
     <div id="gearSummary" class="dim" style="font-size:12px;margin-top:8px;"></div>
     <div class="dim" style="font-size:11px;">GEAR SOURCES: enemy drops, smashed barrels, cracked nodes</div>
+  </div>
+  <div class="panel">
+    <div class="row"><span>INVENTORY // equipped gear — pictures match your rig</span><span><button id="invBtn">SHOW INVENTORY</button></span></div>
+    <div id="invBox" style="display:none;font-size:12px;margin-top:8px;"></div>
   </div>
   <div class="panel">
     <div class="row"><span>CRAFTING // paragon / prestige — Data is the currency, nothing here costs crypto</span></div>
@@ -544,7 +548,7 @@ function mobPoolFor(stage) {
   return [ENEMIES[stage % 6], ENEMIES[(stage + 2) % 6], ENEMIES[(stage + 4) % 6]];
 }
 var SAVE_KEY = 'xploit-hero-poc-v2';
-var GAME_VERSION = 'v21d'; // v21d: shown in the header stats row (VER) + #sub, updated per slice; save key never changes with it.
+var GAME_VERSION = 'v21'; // v21e: final 70-tier slice — title becomes POC v21 per spec §9 (not v21e); save key never changes with it.
 var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR'], [25, 'GHOST IN THE MACHINE'], [30, 'ZERO-DAY LEGEND'], [40, 'MAINFRAME MYTH'], [50, 'SINGULARITY']]; // v21d: paragon ranks (v20 §5.1)
 var KILLS_PER_STAGE = 5;
 var AC = null;
@@ -905,6 +909,7 @@ function gainData(n) {
     S.heroHp = maxHpEff();
     log('LEVEL UP // now LVL ' + S.level + ' ' + rankFor(S.level) + ', ATK +3');
     ding();
+    checkRankChange();
   }
 }
 function addItem(type, tier) {
@@ -1151,6 +1156,121 @@ function renderBench() {
   });
   document.getElementById('gearSummary').textContent = parts.length ? ('GEAR: ' + parts.join(' • ')) : 'GEAR: none yet — breach foes for drops, or crack a data node';
 }
+// ---------- v21e: equipped-gear inventory + rank-up ding ----------
+// Rank-up: fires once per rank-TITLE change, on rank-index increase only.
+// Paragon-era ranks (levels 25/30/40/50 in RANKS) are covered because
+// rankFor() is level-based. A downgrade (prestige reset, wipe) updates
+// lastRank silently — never a celebration. Level-ups keep their ding().
+function rankIndex(rank) { var i = -1; RANKS.forEach(function (t, k) { if (t[1] === rank) i = k; }); return i; }
+var lastRank = rankFor(S.level);
+var rankCelebUntil = 0, rankCelebCount = 0;
+function rankDing() { tone(523, 0, 0.22, 'triangle', 0.18); tone(784, 0.12, 0.22, 'triangle', 0.18); tone(1046, 0.24, 0.4, 'triangle', 0.18); }
+function checkRankChange() {
+  var nowRank = rankFor(S.level);
+  if (nowRank === lastRank) return;
+  if (rankIndex(nowRank) > rankIndex(lastRank)) {
+    lastRank = nowRank;
+    rankCelebCount += 1;
+    rankCelebUntil = Date.now() + 1500;
+    for (var k = 0; k < 8; k++) { var a = k * Math.PI / 4; bursts.push({ x: hero.x + Math.cos(a) * 26, y: hero.y + Math.sin(a) * 26, life: 0.8, max: 0.8, color: '#facc15' }); }
+    log('RANK UP // now ' + nowRank + ' — sparkle + ding');
+    rankDing();
+  } else { lastRank = nowRank; }
+}
+// Cycle pips: one per 5-tier style cycle, display capped at 5 pips + +N.
+function cyclePips(tier) {
+  var c = Math.floor((tier - 1) / 5);
+  if (c <= 0) return '';
+  var shown = Math.min(5, c), out = '';
+  for (var i = 0; i < shown; i++) out += '●';
+  return c > 5 ? out + ' +' + (c - 5) : out;
+}
+function weaponStyleBase(tier) { var STYLES = ['FAST', 'RIFLE', 'SPLASH', 'PIERCE', 'HEAVY']; return tier <= 0 ? 'MELEE' : STYLES[(tier - 1) % 5]; }
+// Armor picture kind mirrors the in-game armor branches (ring / plates /
+// pulse ring / double ring + shards / gold aura). T6+ uses the T5 gold
+// aura in the band color — the in-game sprite draws nothing past T5,
+// so the inventory picture is the first place a high-tier shell is seen.
+function armorPicKind(tier) {
+  if (tier <= 0) return 'NONE';
+  if (tier === 1) return 'RING';
+  if (tier === 2) return 'PLATES';
+  if (tier === 3) return 'PULSE RING';
+  if (tier === 4) return 'DOUBLE RING + SHARDS';
+  return 'GOLD AURA';
+}
+function itemBonus(item) {
+  if (!item) return 0;
+  if (item.type === 'weapon') return item.tier <= 5 ? item.tier * 3 + (item.bonus || 0) : Math.round(15 * Math.pow(1.18, item.tier - 5)) + (item.bonus || 0);
+  return item.tier <= 5 ? item.tier * 2 + (item.bonus || 0) : Math.round(10 * Math.pow(1.18, item.tier - 5)) + (item.bonus || 0);
+}
+function invCardText(item) {
+  if (!item) return '';
+  var gold = goldNameplate(item) ? ' [GOLD]' : '';
+  var aff = affixText(item);
+  var set = item.set ? ' · ' + SET_CHIP[item.set] : '';
+  var pips = cyclePips(item.tier);
+  if (item.type === 'weapon') {
+    // Inventory shows the TOP weapon, so weaponStats() is its style.
+    var ws = weaponStats();
+    return item.name + stars(item.rarity || 0) + gold + ' · T' + item.tier + ' · ' + bandEpithet(item.tier) + ' · PIC: ' + weaponStyleBase(item.tier) + ' ' + ws.style + (pips ? ' · pips ' + pips : '') + ' · ' + itemBonus(item) + ' DMG' + (aff ? ' · ' + aff : '') + set;
+  }
+  return item.name + stars(item.rarity || 0) + gold + ' · T' + item.tier + ' · ' + bandEpithet(item.tier) + ' · PIC: ' + armorPicKind(item.tier) + (pips ? ' · pips ' + pips : '') + ' · +' + itemBonus(item) + ' ARMOR' + (aff ? ' · ' + aff : '') + set;
+}
+function invData() {
+  var w = topItem('weapon'), a = topItem('armor');
+  return { weapon: w, armor: a,
+    weaponText: w ? invCardText(w) : 'FISTS · T0 · MELEE · ' + S.baseAtk + ' DMG',
+    armorText: a ? invCardText(a) : 'NO SHELL · T0 · PIC: NONE · +0 ARMOR' };
+}
+// Inventory pictures draw the same silhouettes as the in-game sprite:
+// weapon bar shapes by base style (FAST/RIFLE/SPLASH/PIERCE/HEAVY) and
+// armor ring/plate shapes by tier, both in the tier's band color.
+// Guarded: in a harness (no canvas context) it returns false and the
+// card text still carries the full PIC descriptor.
+function drawInvPicture(canvas, item) {
+  if (!canvas || !canvas.getContext) return false;
+  var c = canvas.getContext('2d');
+  if (!c) return false;
+  var col = item ? tierColor(item.tier) : '#00ff88';
+  c.clearRect(0, 0, 72, 48);
+  if (!item) { c.fillStyle = col; c.fillRect(28, 22, 16, 4); return true; }
+  if (item.type === 'weapon') {
+    var base = weaponStyleBase(item.tier);
+    c.fillStyle = col;
+    if (base === 'FAST') c.fillRect(6, 22, 30, 4);
+    else if (base === 'RIFLE') c.fillRect(6, 21, 44, 6);
+    else if (base === 'SPLASH') { c.fillRect(6, 19, 46, 10); c.beginPath(); c.arc(56, 24, 8, 0, Math.PI * 2); c.fill(); }
+    else if (base === 'PIERCE') { c.fillRect(6, 18, 54, 3); c.fillRect(6, 27, 54, 3); }
+    else { c.fillRect(6, 19, 56, 10); c.beginPath(); c.arc(62, 24, 9, 0, Math.PI * 2); c.fill(); }
+  } else {
+    c.strokeStyle = col; c.lineWidth = 3;
+    var t = item.tier;
+    if (t === 1) { c.beginPath(); c.arc(36, 24, 14, 0, Math.PI * 2); c.stroke(); }
+    else if (t === 2) { c.fillStyle = col; c.fillRect(12, 8, 6, 32); c.fillRect(54, 8, 6, 32); }
+    else if (t === 3) { c.beginPath(); c.arc(36, 24, 15, 0, Math.PI * 2); c.stroke(); }
+    else if (t === 4) { c.beginPath(); c.arc(36, 24, 14, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(36, 24, 19, 0, Math.PI * 2); c.stroke(); c.fillStyle = col; for (var k = 0; k < 4; k++) { var a = k * Math.PI / 2; c.fillRect(36 + Math.cos(a) * 19 - 2, 24 + Math.sin(a) * 19 - 2, 4, 4); } }
+    else { c.beginPath(); c.arc(36, 24, 15, 0, Math.PI * 2); c.stroke(); c.setLineDash([6, 6]); c.beginPath(); c.arc(36, 24, 20, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); }
+  }
+  return true;
+}
+var lastInvKey = '';
+function renderInventory() {
+  var box = document.getElementById('invBox');
+  if (!box || box.style.display === 'none') return;
+  var d = invData();
+  var key = d.weaponText + '||' + d.armorText;
+  if (key === lastInvKey) return;
+  lastInvKey = key;
+  var wCol = d.weapon ? tierColor(d.weapon.tier) : '#00ff88';
+  var aCol = d.armor ? tierColor(d.armor.tier) : '#00ff88';
+  var wGold = d.weapon && goldNameplate(d.weapon) ? 'color:#facc15;' : '';
+  var aGold = d.armor && goldNameplate(d.armor) ? 'color:#facc15;' : '';
+  box.innerHTML = '<div style="border:1px solid ' + wCol + ';padding:6px;margin-bottom:6px;"><canvas id="invCanvasW" width="72" height="48"></canvas><div style="' + wGold + '">WEAPON // ' + d.weaponText + '</div></div>' +
+    '<div style="border:1px solid ' + aCol + ';padding:6px;"><canvas id="invCanvasA" width="72" height="48"></canvas><div style="' + aGold + '">ARMOR // ' + d.armorText + '</div></div>';
+  drawInvPicture(document.getElementById('invCanvasW'), d.weapon);
+  drawInvPicture(document.getElementById('invCanvasA'), d.armor);
+}
+
 // ---------- v21d: crafting (v20 §4, caps per v21 §6.3), paragon, prestige ----------
 var RUNE_TYPES = ['haste', 'thorns', 'greed', 'vitality'];
 function craftCostReroll(item, useLock) {
@@ -1271,6 +1391,7 @@ function doPrestige() {
   fresh.theme = keptTheme; fresh.themeUnlocked = keptUnlocked; fresh.handle = keptHandle; fresh.ladderAnnounced = keptLadder;
   fresh.prestige = pcount; fresh.prestigeUniqueTiers = snap;
   S = fresh;
+  lastRank = rankFor(S.level);
   Object.keys(snap).forEach(function (id) { if (snap[id]) S.items.push(uniqueItem(id, snap[id])); });
   S.heroHp = maxHpEff();
   save(); renderBench();
@@ -1643,6 +1764,13 @@ document.getElementById('healBtn').onclick = function () {
   S.healReadyAt = now + (setCount('VOID') >= 2 ? 30000 : 25000);
   log('PATCH UP // +50% hull (' + (setCount('VOID') >= 2 ? '30s' : '25s') + ' recharge)');
 };
+document.getElementById('invBtn').onclick = function () {
+  var box = document.getElementById('invBox');
+  var show = box.style.display === 'none';
+  box.style.display = show ? 'block' : 'none';
+  document.getElementById('invBtn').textContent = show ? 'HIDE INVENTORY' : 'SHOW INVENTORY';
+  if (show) { lastInvKey = ''; renderInventory(); }
+};
 document.getElementById('statsBtn').onclick = function () {
   var sb = document.getElementById('statsBox');
   var show = sb.style.display === 'none';
@@ -1663,6 +1791,7 @@ document.getElementById('resetBtn').onclick = function () {
   if (confirm('Wipe this save and restart at level 0?')) {
     try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     S = blankState();
+    lastRank = rankFor(S.level); lastInvKey = '';
     enemies = [];
     world = [];
     pickups = [];
@@ -2499,6 +2628,16 @@ drawMob(e, c);
     ctx.textAlign = 'left';
   }
   drawMinimap(w, h);
+  // v21e: rank-up sparkle ring around the rig while the celebration lasts.
+  if (Date.now() < rankCelebUntil) {
+    var rf = 1 - (rankCelebUntil - Date.now()) / 1500;
+    ctx.strokeStyle = 'rgba(250,204,21,' + (1 - rf) + ')'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(hero.x, hero.y, 30 + rf * 40, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#facc15';
+    ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('RANK UP // ' + rankFor(S.level), hero.x, hero.y - 52);
+    ctx.textAlign = 'left';
+  }
 }
 // ---------- v21d: minimap (endless world makes the mainframe unfindable) ----------
 // Small top-right overlay, hero at center, radius 350 world px (covers the
@@ -2562,6 +2701,7 @@ function drawMinimap(w, h) {
 }
 function renderStats() {
   document.getElementById('verLabel').textContent = GAME_VERSION;
+  checkRankChange();
   // v21d: PRESTIGE ×n intro line (shown on the intro overlay whenever prestige > 0).
   var pi = document.getElementById('prestigeIntro');
   if (pi) pi.textContent = S.prestige ? ('PRESTIGE ×' + S.prestige + ' // +' + (10 * S.prestige) + '% damage, +' + (10 * S.prestige) + '% Data') : '';
@@ -2609,6 +2749,7 @@ function renderStats() {
   hb.textContent = hRemain > 0 ? ('PATCH UP // ' + hRemain + 's') : 'PATCH UP // +50%';
   var ci = document.getElementById('craftInfo');
   if (ci) ci.textContent = craftInfoText();
+  renderInventory();
   var sb = document.getElementById('statsBox');
   if (sb && sb.style.display !== 'none') {
     var avg = AN.totals.sessions > 0 ? Math.round(AN.totals.playSecs / AN.totals.sessions / 60) : 0;
