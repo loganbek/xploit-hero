@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v21c</title>
+<title>XPLOIT HERO — POC v21d</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v21c // 70-tier ladder — sets + retiered uniques</div>
+  <div id="sub">POC v21d // 70-tier ladder — crafting caps, paragon, prestige</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -71,6 +71,7 @@
       <p><b>LOOT:</b> foes drop gear on the ground — <b>walk over it to grab it</b>. Pairs auto-merge into stronger gear.</p>
       <p><b>CLIMB:</b> level 0 NOOB → <b class="pink">ELITE HAXZOR</b>. Watch RIG VS SECTOR to know how you stand.</p>
       <p><b>WORLD:</b> shove crates around, smash barrels, crack data nodes for loot.</p>
+      <p id="prestigeIntro" class="dim"></p>
       <p><b>WEAPONS:</b> tiers shoot differently now — check the label for damage, speed, and style.</p>
       <p><b>ANALYTICS:</b> your play is tracked locally — open STATS below the bench. Nothing leaves this device.</p>
       <p><b>STYLE:</b> finish your first job and FUSE hands you <b>style.css</b> — repaint the whole world.</p>
@@ -110,6 +111,24 @@
     <div id="bench"></div>
     <div id="gearSummary" class="dim" style="font-size:12px;margin-top:8px;"></div>
     <div class="dim" style="font-size:11px;">GEAR SOURCES: enemy drops, smashed barrels, cracked nodes</div>
+  </div>
+  <div class="panel">
+    <div class="row"><span>CRAFTING // paragon / prestige — Data is the currency, nothing here costs crypto</span></div>
+    <div id="craftInfo" class="dim" style="font-size:12px;margin-top:8px;white-space:pre-wrap;"></div>
+    <div id="btns" style="grid-template-columns:1fr 1fr 1fr;">
+      <button id="rerollWBtn">REROLL WEAPON</button>
+      <button id="rerollWLockBtn">REROLL W (LOCK)</button>
+      <button id="rerollABtn">REROLL ARMOR</button>
+      <button id="starWBtn">STAR WEAPON</button>
+      <button id="starABtn">STAR ARMOR</button>
+      <button id="socketWBtn">SOCKET WEAPON</button>
+      <button id="socketABtn">SOCKET ARMOR</button>
+      <button id="paraOvkBtn">PARAGON OVK +1</button>
+      <button id="paraBlwBtn">PARAGON BLW +1</button>
+      <button id="paraSwfBtn">PARAGON SWF +1</button>
+      <button id="paraRespecBtn">PARAGON RESPEC</button>
+      <button id="prestigeBtn">PRESTIGE</button>
+    </div>
   </div>
   <div class="panel">
     <div class="row"><span>ANALYTICS // user 0 → user N — local only, nothing leaves this device</span><span><button id="statsBtn">SHOW STATS</button> <button id="exportBtn">EXPORT DATA</button></span></div>
@@ -246,7 +265,20 @@ function mergeAffixes(a, b, newTier) {
   };
 }
 // v20a: effective max HP = base max HP + 10 per BULWARK stack on top armor.
-function maxHpEff() { return S.maxHp + 10 * topAffixStacks('armor', 'bulwark'); }
+function maxHpEff() {
+  var hp = S.maxHp + 10 * topAffixStacks('armor', 'bulwark');
+  if (S.paragon) hp += 8 * (S.paragon.bulwark || 0); // v21d: BULWARK +8 max HP/pt
+  var a = topItem('armor');
+  if (a && a.rune === 'vitality') hp += 20; // v21d: RUNE OF VITALITY +20 max HP
+  return hp;
+}
+function paragonMul() { return 1 + 0.02 * ((S.paragon && S.paragon.overclock) || 0); } // v21d: OVERCLOCK +2% dmg/pt
+function prestigeMul() { return 1 + 0.10 * (S.prestige || 0); } // v21d: +10% dmg per prestige, additive
+function prestigeDataMul() { return 1 + 0.10 * (S.prestige || 0); } // v21d: +10% Data per prestige
+function shotDmg() { // v21d: base shot damage incl. affix, set, paragon, prestige multipliers
+  return Math.round(atk() * (1 + 0.08 * topAffixStacks('weapon', 'overclocked')) * setDmgMul() * paragonMul() * prestigeMul());
+}
+function topRune(type) { var it = topItem(type); return it ? (it.rune || null) : null; }
 // v20a: GREED counts from top weapon + top armor, capped at 2 stacks total
 // (spec table max stacks 2; drop bonus caps at +20% at 2 stacks).
 function greedStacks() { return Math.min(2, topAffixStacks('weapon', 'greed') + topAffixStacks('armor', 'greed')); }
@@ -370,6 +402,38 @@ function setDmgMul() {
 var ghostCloakReadyAt = 0; // phase cloak: ready at start, then 20s cooldown
 var voidEchoUntil = 0, voidEchoLast = 0; // void echo pet: 10s, refreshes on proc
 
+// ---------- v21d: sector mutators (v20 §5.2, stage 21+) ----------
+// 1 per non-boss stage, 2 per boss stage, never the same twice on a boss
+// stage. Shown in the sector label via sectorLabelText(). Effects:
+// SWARM +50% foes (wave 8, HP -20%), ARMORED HP +40%/speed -20%,
+// VOLATILE foes explode 15 dmg in 60px on death (clamped so the blast
+// never kills you outright — it has no rig-down path), DRAIN no
+// out-of-combat regen + 5 HP/kill, RICH HP +25%/Data +50%/drop +10%.
+// Every mutator except RICH also pays +25% Data from kills.
+var MUTATORS = ['SWARM', 'ARMORED', 'VOLATILE', 'DRAIN', 'RICH'];
+function hasMutator(m) { return (S.stageMutators || []).indexOf(m) >= 0; }
+function rollMutators(stage) {
+  if (stage < 21) return [];
+  var pool = MUTATORS.slice(), out = [];
+  var n = (stage % 10 === 0) ? 2 : 1;
+  for (var i = 0; i < n && pool.length; i++) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
+function mutatorDataMul() {
+  if (!S.stageMutators || !S.stageMutators.length) return 1;
+  if (hasMutator('RICH')) return 1.5;
+  return 1.25;
+}
+function mutatorWaveTotal() { return (S.stage >= 21 && hasMutator('SWARM') && !isBossStage()) ? 8 : KILLS_PER_STAGE; }
+function sectorLabelText() {
+  var sector = themeFor(S.stage);
+  var paint = canvasPaint();
+  var base = paint.boss ? ('STAGE ' + S.stage + ' // FIREWALL // RED ALERT // ' + Math.round(hero.x) + ',' + Math.round(hero.y))
+    : ('STAGE ' + S.stage + ' // ' + paint.tag + ' // SECTOR: ' + sector.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y));
+  if (S.stage >= 21 && S.stageMutators && S.stageMutators.length) base += ' // MUTATOR: ' + S.stageMutators.join('+');
+  return base;
+}
+
 var ENEMIES = ['DAEMON', 'MALWARE', 'WORM', 'TROJAN', 'ROOTKIT', 'SPYWARE'];
 // Stage themes: every sector looks different. Boss stages override to RED ALERT.
 var THEMES = [
@@ -480,8 +544,8 @@ function mobPoolFor(stage) {
   return [ENEMIES[stage % 6], ENEMIES[(stage + 2) % 6], ENEMIES[(stage + 4) % 6]];
 }
 var SAVE_KEY = 'xploit-hero-poc-v2';
-var GAME_VERSION = 'v21c'; // v21c: shown in the header stats row (VER) + #sub, updated per slice; save key never changes with it.
-var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR']];
+var GAME_VERSION = 'v21d'; // v21d: shown in the header stats row (VER) + #sub, updated per slice; save key never changes with it.
+var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR'], [25, 'GHOST IN THE MACHINE'], [30, 'ZERO-DAY LEGEND'], [40, 'MAINFRAME MYTH'], [50, 'SINGULARITY']]; // v21d: paragon ranks (v20 §5.1)
 var KILLS_PER_STAGE = 5;
 var AC = null;
 function tone(freq, delay, dur, type, vol) {
@@ -517,7 +581,13 @@ function blankState() {
     // kills at stages >= 30 since the last CORE award/convert.
     setLog: { GHOST: 0, NEON: 0, VOID: 0 }, setSeen: {},
     uniques: { vex: false, core: false, halcyon: false, lastlight: false },
-    corePity: 0, generalNodes: 0
+    corePity: 0, generalNodes: 0,
+    // v21d: paragon (points from level 21, 1/level, max 20/track), prestige
+    // (count + snapshot tiers for re-grant), runes (inventory, max 8),
+    // craftLock (single locked affix, free), stageMutators (this stage).
+    paragon: { overclock: 0, bulwark: 0, swift: 0, available: 0, total: 0 },
+    prestige: 0, prestigeUniqueTiers: {},
+    runes: [], craftLock: null, stageMutators: [], runeFirstDropped: false
   };
 }
 function rankFor(level) {
@@ -581,6 +651,8 @@ function weaponStats() {
   return { int: Math.max(300, Math.round(base.int * Math.pow(0.95, cycle))), range: Math.min(320, base.range + 15 * cycle), style: name, splash: Math.min(150, base.splash + 15 * cycle), pierce: base.pierce };
 }
 function spawnWorld() {
+  // v21d: mutators roll with the sector, so a stage always carries its own.
+  S.stageMutators = rollMutators(S.stage);
   world = [];
   var boss = isBossStage();
   var nCrates = boss ? 1 : 2, nBarrels = boss ? 1 : 2, nNodes = boss ? 0 : 1;
@@ -667,7 +739,7 @@ var lastFire = 0, lastSpawn = 0, lastSave = 0, lastRegen = 0, lastRgn = 0, lastT
 var pendingStage = 0, intermissionUntil = 0, spawnProtectUntil = 0;
 var waveTotal = 5, waveSpawned = 0;
 function resetWave() {
-  waveTotal = isBossStage() ? 1 : KILLS_PER_STAGE;
+  waveTotal = isBossStage() ? 1 : mutatorWaveTotal();
   waveSpawned = 0;
 }
 
@@ -687,6 +759,11 @@ function load() {
     if (p.theme === undefined) s.theme = 'deep-terminal';
     if (!AESTHETICS[s.theme]) s.theme = 'deep-terminal';
     if (p.generalNodes === undefined) s.generalNodes = s.nodeIdx; // pre-v21c saves: nodeIdx IS the general-node count
+    // v21d: pre-v21d saves at level 21+ never had paragon points — grant
+    // them retroactively (level - 20), since no points could have been spent.
+    if (s.level >= 21 && (!s.paragon || !s.paragon.total)) {
+      s.paragon = { overclock: 0, bulwark: 0, swift: 0, available: s.level - 20, total: s.level - 20 };
+    }
     s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } if (!it.affixes) it.affixes = rollAffixes(it.type, it.tier); });
     return s;
   } catch (e) { return null; }
@@ -793,12 +870,16 @@ function spawnEnemy(boss) {
   }
   var r = boss ? 30 : Math.round(baseR + Math.min(8, S.stage * 0.4));
   hp = Math.round(hp * hpMul);
+  // v21d mutators: SWARM -20% HP, ARMORED +40% HP, RICH +25% HP.
+  if (hasMutator('SWARM')) hp = Math.round(hp * 0.8);
+  if (hasMutator('ARMORED')) hp = Math.round(hp * 1.4);
+  if (hasMutator('RICH')) hp = Math.round(hp * 1.25);
   enemies.push({
     name: boss ? ('FIREWALL ICE // STAGE ' + S.stage) : kind + ' v' + S.stage,
     boss: boss, kind: kind, shape: shape, color: color,
     x: x, y: y, r: r,
     hp: hp, maxHp: hp, dmg: Math.round(enemyDmgFor(S.stage, boss) * dmgMul),
-    speed: Math.round(enemySpeedFor(S.stage, boss) * speedMul), hitCd: 0,
+    speed: Math.round(enemySpeedFor(S.stage, boss) * speedMul * (hasMutator('ARMORED') ? 0.8 : 1)), hitCd: 0,
     slot: Math.random() * Math.PI * 2, orbit: (Math.random() < 0.5 ? -1 : 1), kx: 0, ky: 0
   });
 }
@@ -807,10 +888,16 @@ function targetEnemyCount() {
   return Math.min(7, 3 + Math.floor(S.stage / 3));
 }
 function gainData(n) {
-  S.data += n;
+  // v21d: prestige +10% Data per prestige applies to every Data gain.
+  S.data += Math.round(n * prestigeDataMul());
   while (S.data >= dataNext()) {
     S.data -= dataNext();
     S.level += 1;
+    // v21d: paragon points — 1 per level from level 21 onward.
+    if (S.level >= 21) {
+      if (!S.paragon) S.paragon = { overclock: 0, bulwark: 0, swift: 0, available: 0, total: 0 };
+      S.paragon.available += 1; S.paragon.total += 1;
+    }
     AN.totals.levelUps += 1;
     AN.totals.bestLevel = Math.max(AN.totals.bestLevel, S.level);
     S.baseAtk += 3;
@@ -848,7 +935,7 @@ function dropTierFor(stage, isBoss) {
   return 1;
 }
 function dropRoll(firstBlood, x, y, isBoss) {
-  var chance = firstBlood ? 1 : Math.min(1, 0.6 + 0.10 * greedStacks());
+  var chance = firstBlood ? 1 : Math.min(1, 0.6 + 0.10 * greedStacks() + (hasMutator('RICH') ? 0.10 : 0));
   if (Math.random() < chance) {
     var type = Math.random() < 0.5 ? 'weapon' : 'armor';
     var tier = dropTierFor(S.stage, !!isBoss);
@@ -864,8 +951,15 @@ function onKill(e, via) {
   if (e.boss) { triggerShake(4, 250); triggerFlash(0.35, 250); maybeSlowmo(e, via); }
   var cryptoGain = addCrypto(5 + S.stage);
   log(e.name + ' breached // +' + cryptoGain + ' crypto');
-  var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()) * (1 + (setCount('NEON') >= 2 ? 0.10 : 0)));
+  var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()) * (1 + (setCount('NEON') >= 2 ? 0.10 : 0)) * mutatorDataMul() * (topRune('weapon') === 'greed' || topRune('armor') === 'greed' ? 1.20 : 1));
   gainData(dataGain);
+  // v21d mutators: DRAIN heals 5 HP per kill; VOLATILE blasts 15 dmg in 60px
+  // (clamped to leave at least 1 HP — the blast has no rig-down path).
+  if (hasMutator('DRAIN')) S.heroHp = Math.min(maxHpEff(), S.heroHp + 5);
+  if (hasMutator('VOLATILE')) {
+    var vd = Math.sqrt((hero.x - e.x) * (hero.x - e.x) + (hero.y - e.y) * (hero.y - e.y));
+    if (vd < 60) { S.heroHp = Math.max(1, S.heroHp - 15); log('VOLATILE // blast -15 HP'); }
+  }
   dropRoll(S.kills === 0, e.x, e.y, e.boss);
   // v21c: VOID 4-piece echo proc on any kill (10%; refresh, never stack).
   if (setCount('VOID') >= 4 && Math.random() < 0.10) {
@@ -900,6 +994,13 @@ function onKill(e, via) {
       if (Math.random() < 0.20 || S.corePity >= 5) {
         var coreRes = grantUnique('core', bandBaseFor(S.stage) || 5);
         if (coreRes === 'awarded' || coreRes === 'converted') S.corePity = 0;
+      }
+    }
+    // v21d: rune drops — 50% per boss kill, guaranteed on the first boss kill.
+    if (e.boss) {
+      if (!S.runeFirstDropped || Math.random() < 0.5) {
+        gainRune(RUNE_TYPES[Math.floor(Math.random() * RUNE_TYPES.length)]);
+        S.runeFirstDropped = true;
       }
     }
     // v19a fallback: first boss kill unlocks the theme switcher too (node-skippers)
@@ -985,7 +1086,17 @@ function tryMerge(a, b) {
   // the merged item is the parent's lineage, not a new piece, so a counted
   // parent transfers its seen mark instead of incrementing the log.
   var parentSeen = !!(S.setSeen && S.setSeen[parent.id]);
-  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || tierName(newTier), bonus: bonus, rarity: rarity, affixes: m.affixes, set: parent.set || null });
+  var otherParent = parent === a ? b : a;
+  var topBefore = topItem(a.type);
+  var lockedMerged = !!(topBefore && (topBefore.id === a.id || topBefore.id === b.id));
+  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || tierName(newTier), bonus: bonus, rarity: rarity, affixes: m.affixes, set: parent.set || null, rune: parent.rune || otherParent.rune || null });
+  // v21d: a socketed rune survives merges (parent first, else the other
+  // parent's — a rune is never destroyed by a merge). A crafting lock on
+  // the merged top item is released only if its affix did not survive.
+  if (S.craftLock && S.craftLock.type === a.type && lockedMerged) {
+    var mergedHasLock = m.affixes.some(function (af) { return af.id === S.craftLock.affix; });
+    if (!mergedHasLock) { S.craftLock = null; log('CRAFT LOCK // released — locked affix lost in merge'); }
+  }
   if (S.items[S.items.length - 1].set && parentSeen) S.setSeen[S.items[S.items.length - 1].id] = true;
   AN.totals.bestTier = Math.max(AN.totals.bestTier, newTier);
   m.dropped.forEach(function () { gainData(5); });
@@ -1040,6 +1151,148 @@ function renderBench() {
   });
   document.getElementById('gearSummary').textContent = parts.length ? ('GEAR: ' + parts.join(' • ')) : 'GEAR: none yet — breach foes for drops, or crack a data node';
 }
+// ---------- v21d: crafting (v20 §4, caps per v21 §6.3), paragon, prestige ----------
+var RUNE_TYPES = ['haste', 'thorns', 'greed', 'vitality'];
+function craftCostReroll(item, useLock) {
+  var base = (useLock ? 100 : 50) * item.tier * item.tier;
+  return Math.min(useLock ? 100000 : 50000, base);
+}
+function craftCostStar(item) {
+  if (item.bonus === 0) return Math.min(10000, 100 * item.tier);
+  if (item.bonus === 1) return Math.min(20000, 200 * item.tier);
+  if (item.bonus === 2) return Math.min(40000, 400 * item.tier);
+  return null;
+}
+function craftCostSocket(item) { return Math.min(15000, 150 * item.tier); }
+function lockAffix(type, affixId) {
+  // v21d: the single lock — free, exactly one affix on the top item of a type.
+  var it = topItem(type);
+  if (!affixId) { S.craftLock = null; save(); return true; }
+  if (!it || !(it.affixes || []).some(function (a) { return a.id === affixId; })) return false;
+  S.craftLock = { type: type, affix: affixId };
+  save(); log('CRAFT LOCK // ' + AFFIX_DEFS[affixId].abbr + ' locked on top ' + type);
+  return true;
+}
+function rerollTop(type, useLock) {
+  var it = topItem(type);
+  if (!it) { log('crafting // no top ' + type + ' to reroll'); return false; }
+  if (isUnique(it)) { log('crafting // uniques cannot be rerolled'); return false; }
+  var kept = [];
+  if (useLock) {
+    if (!S.craftLock || S.craftLock.type !== type) { log('crafting // no lock on top ' + type + ' — lock one affix first'); return false; }
+    kept = (it.affixes || []).filter(function (a) { return a.id === S.craftLock.affix; });
+    if (!kept.length) { log('crafting // locked affix is not on the top ' + type); return false; }
+  }
+  var cost = craftCostReroll(it, useLock);
+  if (S.data < cost) { log('crafting // need ' + cost + ' Data, have ' + S.data); return false; }
+  S.data -= cost;
+  var fresh = rollAffixes(type, it.tier).filter(function (a) { return !kept.some(function (k) { return k.id === a.id; }); });
+  it.affixes = kept.concat(fresh).slice(0, itemSlots(it));
+  save(); renderBench();
+  log('CRAFT // rerolled top ' + type + ' for ' + cost + ' Data' + (kept.length ? ' (lock kept ' + AFFIX_DEFS[kept[0].id].abbr + ')' : ''));
+  return true;
+}
+function starUpgradeTop(type) {
+  var it = topItem(type);
+  if (!it) return false;
+  if (isUnique(it)) { log('crafting // uniques cannot take star upgrades'); return false; }
+  var cost = craftCostStar(it);
+  if (cost === null) { log('crafting // already ★★★'); return false; }
+  if (S.data < cost) { log('crafting // need ' + cost + ' Data, have ' + S.data); return false; }
+  S.data -= cost;
+  it.bonus = it.bonus === 0 ? 1 : (it.bonus === 1 ? 2 : 4);
+  it.rarity = [0, 1, 2, 4].indexOf(it.bonus);
+  save(); renderBench();
+  log('CRAFT // star upgrade top ' + type + ' to +' + it.bonus + ' for ' + cost + ' Data');
+  return true;
+}
+function gainRune(id) {
+  if (!S.runes) S.runes = [];
+  if (S.runes.length >= 8) { S.data += 25; log('RUNE // inventory full — converted to +25 Data'); return false; }
+  S.runes.push(id);
+  log('RUNE // ' + id.toUpperCase() + ' dropped — socket it in CRAFTING');
+  return true;
+}
+function socketTop(type) {
+  var it = topItem(type);
+  if (!it) return false;
+  if (!S.runes || !S.runes.length) { log('crafting // no runes in inventory — boss kills drop them'); return false; }
+  // HASTE weapon-only, THORNS/VITALITY armor-only, GREED either type.
+  var idx = -1;
+  for (var i = 0; i < S.runes.length; i++) {
+    var r = S.runes[i];
+    if (r === 'greed' || (r === 'haste' && type === 'weapon') || ((r === 'thorns' || r === 'vitality') && type === 'armor')) { idx = i; break; }
+  }
+  if (idx < 0) { log('crafting // no rune in inventory fits a ' + type); return false; }
+  var cost = craftCostSocket(it);
+  if (S.data < cost) { log('crafting // need ' + cost + ' Data, have ' + S.data); return false; }
+  var refund = it.rune ? Math.round(cost * 0.5) : 0;
+  var rune = S.runes.splice(idx, 1)[0];
+  S.data -= cost; S.data += refund;
+  it.rune = rune;
+  save(); renderBench();
+  log('CRAFT // socketed ' + rune.toUpperCase() + ' into top ' + type + ' for ' + cost + ' Data' + (refund ? (' (replaced rune refund +' + refund + ' Data)') : ''));
+  return true;
+}
+function paragonAllocate(track) {
+  if (!S.paragon) S.paragon = { overclock: 0, bulwark: 0, swift: 0, available: 0, total: 0 };
+  if (S.paragon.available <= 0 || S.paragon[track] >= 20) return false;
+  S.paragon[track] += 1; S.paragon.available -= 1;
+  S.heroHp = Math.min(maxHpEff(), S.heroHp);
+  save(); log('PARAGON // ' + track.toUpperCase() + ' +' + S.paragon[track]);
+  return true;
+}
+function paragonRespec() {
+  if (S.data < 500) { log('paragon // respec needs 500 Data'); return false; }
+  S.data -= 500;
+  var spent = (S.paragon.overclock || 0) + (S.paragon.bulwark || 0) + (S.paragon.swift || 0);
+  S.paragon.available += spent;
+  S.paragon.overclock = 0; S.paragon.bulwark = 0; S.paragon.swift = 0;
+  save(); log('PARAGON // respec — ' + spent + ' points refunded');
+  return true;
+}
+function prestigeAvailable() { return S.stage >= 25 && S.level >= 20; }
+function doPrestige() {
+  if (!prestigeAvailable()) { log('prestige // need stage 25 + level 20'); return false; }
+  // v21d snapshot rule: re-grant at the tier owned BEFORE prestige, not base.
+  var snap = {};
+  Object.keys(S.uniques || {}).forEach(function (id) {
+    if (!S.uniques[id]) return;
+    var it = (S.items || []).filter(function (x) { return x.unique === id; })[0];
+    snap[id] = it ? it.tier : (S.prestigeUniqueTiers && S.prestigeUniqueTiers[id]) || null;
+  });
+  var keptParagon = S.paragon, keptSetLog = S.setLog, keptSetSeen = S.setSeen, keptUniques = S.uniques;
+  var keptArc = { arcStep: S.arcStep, nodeIdx: S.nodeIdx, ghostDone: S.ghostDone, generalNodes: S.generalNodes };
+  var keptTheme = S.theme, keptUnlocked = S.themeUnlocked, keptHandle = S.handle, keptLadder = S.ladderAnnounced;
+  var pcount = (S.prestige || 0) + 1;
+  var fresh = blankState();
+  fresh.paragon = keptParagon; fresh.setLog = keptSetLog; fresh.setSeen = keptSetSeen; fresh.uniques = keptUniques;
+  fresh.arcStep = keptArc.arcStep; fresh.nodeIdx = keptArc.nodeIdx; fresh.ghostDone = keptArc.ghostDone; fresh.generalNodes = keptArc.generalNodes;
+  fresh.theme = keptTheme; fresh.themeUnlocked = keptUnlocked; fresh.handle = keptHandle; fresh.ladderAnnounced = keptLadder;
+  fresh.prestige = pcount; fresh.prestigeUniqueTiers = snap;
+  S = fresh;
+  Object.keys(snap).forEach(function (id) { if (snap[id]) S.items.push(uniqueItem(id, snap[id])); });
+  S.heroHp = maxHpEff();
+  save(); renderBench();
+  if (started) { hero.x = arenaW() / 2; hero.y = arenaH() / 2; hero.vx = 0; hero.vy = 0; spawnWorld(); resetWave(); }
+  log('PRESTIGE ×' + pcount + ' // +10% damage, +10% Data — uniques re-granted at snapshot tiers');
+  return true;
+}
+function craftInfoText() {
+  var w = topItem('weapon'), a = topItem('armor');
+  var pg = S.paragon || { overclock: 0, bulwark: 0, swift: 0, available: 0 };
+  var out = 'CRAFTING: reroll W ' + (w ? craftCostReroll(w, false) : '—') + ' / lock ' + (w ? craftCostReroll(w, true) : '—') +
+    ' · reroll A ' + (a ? craftCostReroll(a, false) : '—') + ' / lock ' + (a ? craftCostReroll(a, true) : '—') +
+    ' · star W ' + (w ? craftCostStar(w) : '—') + ' · star A ' + (a ? craftCostStar(a) : '—') +
+    ' · socket ' + (w ? craftCostSocket(w) : '—') +
+    ' · lock: ' + (S.craftLock ? (S.craftLock.type + ' ' + AFFIX_DEFS[S.craftLock.affix].abbr) : 'none') +
+    ' · runes: ' + ((S.runes && S.runes.length) ? S.runes.join(',') : 'none');
+  out += '\nPARAGON: OVERCLOCK ' + pg.overclock + ' (+' + (2 * pg.overclock) + '% dmg) · BULWARK ' + pg.bulwark + ' (+' + (8 * pg.bulwark) + ' HP) · SWIFT ' + pg.swift + ' (+' + pg.swift + '% speed) · available ' + pg.available + ' · respec 500 Data';
+  out += '\nPRESTIGE: ×' + (S.prestige || 0) + ' (+' + (10 * (S.prestige || 0)) + '% dmg/Data) · ' + (prestigeAvailable() ? 'READY — tap PRESTIGE' : 'needs stage 25 + level 20');
+  out += '\nMUTATORS: ' + (S.stage >= 21 ? ((S.stageMutators || []).join('+') || 'none') : 'none below stage 21');
+  return out;
+}
+
 var STORY_NODES = [
   {
     title: 'THE DATABASE',
@@ -1413,8 +1666,19 @@ document.getElementById('resetBtn').onclick = function () {
     enemies = [];
     world = [];
     pickups = [];
+    bursts = [];
+    floaters = [];
+    tracers = [];
     intermissionUntil = 0;
     spawnProtectUntil = 0;
+    // v21d BUG FIX: the old wipe left waveSpawned == waveTotal with no
+    // world and no intro, so stage 1 softlocked on a "walk to the
+    // mainframe" objective with nothing to walk to. A wipe now fully
+    // restarts: back to the intro, wave reset, so JACK IN spawns a
+    // proper fresh stage 1 with enemies.
+    started = false;
+    document.getElementById('intro').style.display = 'flex';
+    resetWave();
     nodePending = false;
     briefingOpen = false;
     termOpen = false;
@@ -1428,6 +1692,19 @@ document.getElementById('resetBtn').onclick = function () {
     log('save wiped // fresh n00b online');
   }
 };
+
+document.getElementById('rerollWBtn').onclick = function () { rerollTop('weapon', false); };
+document.getElementById('rerollWLockBtn').onclick = function () { rerollTop('weapon', true); };
+document.getElementById('rerollABtn').onclick = function () { rerollTop('armor', false); };
+document.getElementById('starWBtn').onclick = function () { starUpgradeTop('weapon'); };
+document.getElementById('starABtn').onclick = function () { starUpgradeTop('armor'); };
+document.getElementById('socketWBtn').onclick = function () { socketTop('weapon'); };
+document.getElementById('socketABtn').onclick = function () { socketTop('armor'); };
+document.getElementById('paraOvkBtn').onclick = function () { paragonAllocate('overclock'); };
+document.getElementById('paraBlwBtn').onclick = function () { paragonAllocate('bulwark'); };
+document.getElementById('paraSwfBtn').onclick = function () { paragonAllocate('swift'); };
+document.getElementById('paraRespecBtn').onclick = function () { paragonRespec(); };
+document.getElementById('prestigeBtn').onclick = function () { doPrestige(); };
 
 // ---------- canvas ----------
 var ctx = cvEl.getContext('2d');
@@ -1822,8 +2099,7 @@ function draw() {
   // v18 patch 3: stage number leads the label — it was sector-only in play
   // v19a: the label names the theme (boss stages name the firewall instead)
   var labelX = 10 + (glitchActive ? (Math.floor(Date.now() / 30) % 2 ? 4 : -4) : 0);
-  var labelTxt = paint.boss ? ('STAGE ' + S.stage + ' // FIREWALL // RED ALERT // ' + Math.round(hero.x) + ',' + Math.round(hero.y))
-    : ('STAGE ' + S.stage + ' // ' + paint.tag + ' // SECTOR: ' + sector.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y));
+  var labelTxt = sectorLabelText(); // v21d: includes MUTATOR on stage 21+ stages
   if (paint.id === 'deep-terminal') ctx.globalAlpha = 0.92 + 0.08 * Math.sin(Date.now() / 90);
   ctx.fillText(labelTxt, labelX, 18);
   ctx.globalAlpha = 1;
@@ -2007,6 +2283,14 @@ drawMob(e, c);
     ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 38, 0, Math.PI * 2); ctx.stroke();
   }
+  // v21d: prestige gold trim ring under the armor ring (alpha 0.25 + 0.15/prestige, cap 1.0).
+  if (S.prestige) {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, 0.25 + 0.15 * S.prestige);
+    ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(hero.x, hero.y, 44, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
   // armor shell by top armor tier — v19b: pulse, shards, aura, hit flash
   var at = topArmorTier();
   var armorFlash = Date.now() < armorFlashUntil; // white rings for 100ms after a hit
@@ -2057,7 +2341,7 @@ drawMob(e, c);
   ctx.fillStyle = '#00e5ff';
   ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(handle(), hx, hy - 34);
+  ctx.fillText(handle() + (S.prestige ? ' ' + '◆'.repeat(Math.min(5, S.prestige)) : ''), hx, hy - 34); // v21d: gold pips, cap 5 displayed
   ctx.textAlign = 'left';
   if (museImg && museImg.complete && museImg.naturalWidth > 0) {
     ctx.drawImage(museImg, hx - 13, hy - 29, 26, 26);
@@ -2214,9 +2498,73 @@ drawMob(e, c);
     ctx.fillText('NEXT SECTOR IN ' + secs + ' — BREATHE', w / 2, 60);
     ctx.textAlign = 'left';
   }
+  drawMinimap(w, h);
+}
+// ---------- v21d: minimap (endless world makes the mainframe unfindable) ----------
+// Small top-right overlay, hero at center, radius 350 world px (covers the
+// off-screen spawn ring). No new mechanics, no save change. Data helper
+// minimapData() exists so the harness can assert counts without a canvas.
+function minimapData() {
+  var server = null;
+  world.forEach(function (o) { if (o.kind === 'server') server = o; });
+  var dx = server ? (server.x - hero.x) : 0, dy = server ? (server.y - hero.y) : 0;
+  var dist = Math.sqrt(dx * dx + dy * dy);
+  return { enemies: enemies.length, server: server, serverDist: dist,
+    serverInRadius: !!server && dist <= 350,
+    serverAngle: server ? Math.atan2(dy, dx) : null };
+}
+function drawMinimap(w, h) {
+  var size = 84, R = 350, half = size / 2, mx = w - size - 10, my = 26;
+  var scale = half / R;
+  function px(wx) { return mx + half + (wx - hero.x) * scale; }
+  function py(wy) { return my + half + (wy - hero.y) * scale; }
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(mx, my, size, size);
+  ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1;
+  ctx.strokeRect(mx, my, size, size);
+  world.forEach(function (o) {
+    var x = px(o.x), y = py(o.y);
+    var inside = x >= mx && x <= mx + size && y >= my && y <= my + size;
+    if (o.kind === 'server') {
+      if (inside) {
+        var pulse = nodePending ? (3 + Math.sin(Date.now() / 200) * 1.5) : 3;
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(x - pulse, y - pulse, pulse * 2, pulse * 2);
+      } else {
+        // off-screen direction indicator: cyan arrow at the minimap edge.
+        var d = minimapData();
+        var ax = mx + half + Math.cos(d.serverAngle) * (half - 6);
+        var ay = my + half + Math.sin(d.serverAngle) * (half - 6);
+        ctx.fillStyle = '#00e5ff';
+        ctx.beginPath();
+        ctx.moveTo(ax + Math.cos(d.serverAngle) * 6, ay + Math.sin(d.serverAngle) * 6);
+        ctx.lineTo(ax + Math.cos(d.serverAngle + 2.5) * 5, ay + Math.sin(d.serverAngle + 2.5) * 5);
+        ctx.lineTo(ax + Math.cos(d.serverAngle - 2.5) * 5, ay + Math.sin(d.serverAngle - 2.5) * 5);
+        ctx.closePath(); ctx.fill();
+      }
+    } else if (inside) {
+      if (o.kind === 'crate') { ctx.fillStyle = 'rgba(139,90,43,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+      else if (o.kind === 'barrel') { ctx.fillStyle = 'rgba(194,65,12,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+      else if (o.kind === 'node') { ctx.fillStyle = 'rgba(0,229,255,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+    }
+  });
+  enemies.forEach(function (e) {
+    var x = px(e.x), y = py(e.y);
+    if (x >= mx && x <= mx + size && y >= my && y <= my + size) {
+      ctx.fillStyle = e.boss ? '#ff2d95' : (e.color || '#00ff88');
+      ctx.fillRect(x - 1, y - 1, 2, 2);
+    }
+  });
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(mx + half - 2, my + half - 2, 4, 4);
+  ctx.restore();
 }
 function renderStats() {
   document.getElementById('verLabel').textContent = GAME_VERSION;
+  // v21d: PRESTIGE ×n intro line (shown on the intro overlay whenever prestige > 0).
+  var pi = document.getElementById('prestigeIntro');
+  if (pi) pi.textContent = S.prestige ? ('PRESTIGE ×' + S.prestige + ' // +' + (10 * S.prestige) + '% damage, +' + (10 * S.prestige) + '% Data') : '';
   document.getElementById('rank').textContent = rankFor(S.level);
   document.getElementById('lvl').textContent = S.level;
   document.getElementById('stage').textContent = S.stage;
@@ -2244,7 +2592,12 @@ function renderStats() {
   document.getElementById('objText').textContent = !started ? 'jack in to start' :
     (intermissionUntil ? ('NEXT SECTOR IN ' + Math.ceil((intermissionUntil - Date.now()) / 1000) + 's — patch up, breathe!') :
     (isBossStage() ? 'kill the FIREWALL ICE boss to clear stage ' + S.stage :
-    (function () { var remain = (waveTotal - waveSpawned) + enemies.length; if (remain <= 0) return 'walk to the mainframe to jack in'; return 'breach ' + remain + ' more daemon' + (remain === 1 ? '' : 's') + ' to clear stage ' + S.stage + (S.stage % 10 === 5 ? ' — then walk to the mainframe' : ''); })()));
+    (function () { var remain = (waveTotal - waveSpawned) + enemies.length;
+      // v21d BUG FIX: remain <= 0 must never say "walk to the mainframe"
+      // except on a node stage (stage % 10 === 5) with nodePending true —
+      // otherwise a stale wave count softlocked the objective line.
+      if (remain <= 0) return (S.stage % 10 === 5 && nodePending) ? 'walk to the mainframe to jack in' : 'next sector incoming — breathe, patch up!';
+      return 'breach ' + remain + ' more daemon' + (remain === 1 ? '' : 's') + ' to clear stage ' + S.stage + (S.stage % 10 === 5 ? ' — then walk to the mainframe' : ''); })()));
   var now = Date.now();
   var ib = document.getElementById('injectBtn');
   var iRemain = Math.ceil((S.injectReadyAt - now) / 1000);
@@ -2254,11 +2607,13 @@ function renderStats() {
   var hRemain = Math.ceil((S.healReadyAt - now) / 1000);
   hb.disabled = hRemain > 0;
   hb.textContent = hRemain > 0 ? ('PATCH UP // ' + hRemain + 's') : 'PATCH UP // +50%';
+  var ci = document.getElementById('craftInfo');
+  if (ci) ci.textContent = craftInfoText();
   var sb = document.getElementById('statsBox');
   if (sb && sb.style.display !== 'none') {
     var avg = AN.totals.sessions > 0 ? Math.round(AN.totals.playSecs / AN.totals.sessions / 60) : 0;
     var f = AN.funnel;
-    sb.textContent = setLogText() + '\nPLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? tierName(AN.totals.bestTier) : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
+    sb.textContent = setLogText() + '\n' + craftInfoText() + '\nPRESTIGE ×' + (S.prestige || 0) + '\nPLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? tierName(AN.totals.bestTier) : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
   }
 }
 function nearestInRange(range) {
@@ -2271,8 +2626,8 @@ function nearestInRange(range) {
 }
 function update(dt, ts) {
   if (!started) return;
-  // v21c: GHOST 2-piece move speed 175 -> 201 (measurable in hero.speed).
-  hero.speed = setCount('GHOST') >= 2 ? 201 : 175;
+  // v21d: base 175 x SWIFT +1%/pt x GHOST 2-piece 1.15 (201 at GHOST alone, as v21c).
+  hero.speed = Math.round(175 * (1 + 0.01 * ((S.paragon && S.paragon.swift) || 0)) * (setCount('GHOST') >= 2 ? 1.15 : 1));
   // v20a: top armor changed (merge/drop) — never hold HP above the new max
   if (S.heroHp > maxHpEff()) S.heroHp = maxHpEff();
   // intermission: breathe between sectors — patch up
@@ -2389,11 +2744,11 @@ function update(dt, ts) {
   // CHN chain arcs, BRN burn, FRS slow, VAM leech. No-affix behavior is unchanged.
   var ws = weaponStats();
   var ovk = topAffixStacks('weapon', 'overclocked');
-  var fireInt = ws.int * (1 - 0.03 * ovk);
+  var fireInt = ws.int * (1 - 0.03 * ovk) * (topRune('weapon') === 'haste' ? 0.9 : 1); // v21d: HASTE rune +10% fire rate
   if (!nodePending && ts - lastFire > fireInt) {
     var t = nearestInRange(ws.range);
     if (t) {
-      var dmg = Math.round(atk() * (1 + 0.08 * ovk) * setDmgMul());
+      var dmg = shotDmg(); // v21d: atk x OVK x sets x paragon x prestige
       // v21c: NEON 4-piece +1 pierce; pierce from all sources caps at 5.
       var prc = Math.min(5, topAffixStacks('weapon', 'piercing') + (setCount('NEON') >= 4 ? 1 : 0));
       var chn = topAffixStacks('weapon', 'chain');
@@ -2580,7 +2935,8 @@ function update(dt, ts) {
       } else {
       S.heroHp -= dmg;
       var thr = topAffixStacks('armor', 'thorns');
-      if (thr > 0 && !e.boss) e.hp -= Math.round(dmg * 0.15 * thr);
+      var reflectRate = 0.15 * thr + (topRune('armor') === 'thorns' ? 0.20 : 0); // v21d: THORNS rune +20%
+      if (reflectRate > 0 && !e.boss) e.hp -= Math.round(dmg * reflectRate);
       e.hitCd = 0.9;
       armorFlashUntil = Date.now() + 100; // v19b: armor rings flash white for 100ms
       floaters.push({ x: hero.x, y: hero.y - 24, txt: '-' + dmg, color: '#ff2d95', life: 1 });
@@ -2671,7 +3027,7 @@ function update(dt, ts) {
       var dd = Math.sqrt((e.x - hero.x) * (e.x - hero.x) + (e.y - hero.y) * (e.y - hero.y));
       if (dd < 220) nearFoe = true;
     });
-    if (!nearFoe) S.heroHp = Math.min(maxHpEff(), S.heroHp + Math.max(1, maxHpEff() * 0.02));
+    if (!nearFoe && !hasMutator('DRAIN')) S.heroHp = Math.min(maxHpEff(), S.heroHp + Math.max(1, maxHpEff() * 0.02)); // v21d: DRAIN disables regen
     lastRegen = ts;
   }
   // v20a: REGEN ticks every 5s, in or out of combat
