@@ -151,8 +151,10 @@ function rollItem(type, tier) {
 function stars(r) { return r === 0 ? '' : (r === 1 ? ' ★' : (r === 2 ? ' ★★' : ' ★★★')); }
 
 // v20a: affixes — player-side power on the TOP weapon / TOP armor only.
-// Slots: T1-T2 = 1, T3-T5 = 2. Stack cap per affix = min(3, tier).
-// Magnitudes are fixed per stack; tier scales capacity, never magnitude.
+// v21b: slots/caps scale by tier band (spec v21 §4.1). T1-T5 keep their exact
+// v20a capacity (migration-safe). Magnitudes are fixed per stack;
+// tier scales capacity, never magnitude.
+function goldNameplate(item) { return !!item && (item.rarity || 0) === 3; }
 var AFFIX_DEFS = {
   vampiric: { abbr: 'VAM', type: 'weapon' },
   overclocked: { abbr: 'OVK', type: 'weapon' },
@@ -167,8 +169,22 @@ var AFFIX_DEFS = {
 };
 var WEAPON_AFFIX_POOL = ['vampiric', 'overclocked', 'piercing', 'chain', 'burn', 'frost', 'greed'];
 var ARMOR_AFFIX_POOL = ['bulwark', 'regen', 'thorns', 'greed'];
-function affixSlots(tier) { return tier <= 2 ? 1 : 2; }
-function affixCap(tier) { return Math.min(3, tier); }
+function affixSlots(tier) {
+  if (tier <= 2) return 1;
+  if (tier <= 10) return 2;
+  if (tier <= 20) return 3;
+  if (tier <= 35) return 4;
+  if (tier <= 50) return 5;
+  return 6;
+}
+function affixCap(tier) {
+  if (tier === 1) return 1;
+  if (tier === 2) return 2;
+  if (tier <= 10) return 3;
+  if (tier <= 20) return 4;
+  if (tier <= 30) return 5;
+  return 6;
+}
 function affixStacks(item, id) {
   var n = 0;
   (item.affixes || []).forEach(function (a) { if (a.id === id) n += a.stacks; });
@@ -190,13 +206,26 @@ function rollAffixes(type, tier) {
     if (stacks > affixCap(tier)) stacks = affixCap(tier);
     out.push({ id: id, stacks: stacks });
   }
+  // v21b: generalize v20a. T1-T2 keep the v20a 40% chance of one affix
+  // (changing it would break the pinned T1-empty roll and the early game).
+  // T3+: the first slot always rolls, each slot beyond the first rolls at
+  // 50% (independent per slot). A rolled affix gets a second stack at 25%
+  // only if the tier's cap allows it (addOne already clamps to the cap).
   if (tier <= 2) { if (Math.random() < 0.40) addOne(); }
-  else { addOne(); if (Math.random() < 0.50) addOne(); }
+  else {
+    addOne();
+    var slots = affixSlots(tier);
+    for (var s = 1; s < slots; s++) { if (Math.random() < 0.50) addOne(); }
+  }
   return out;
 }
-// v20a merge inheritance (spec 1.3): union, shared stacks add to the new
-// tier's cap, slot overflow keeps highest stacks (ties: A before B) and
-// refunds +5 Data per dropped affix. Star bonus = max, never rerolled.
+// v20a merge inheritance (spec 1.3), v21b with more slots (spec v21 §4.2):
+// union, shared stacks add to the new tier's cap, slot overflow keeps
+// highest stacks (ties: A before B) and refunds +5 Data per dropped affix
+// (paid in tryMerge). Star bonus = max, never rerolled. Note: merge pairs
+// are always same-tier (tryMerge enforces it), so the spec's "higher
+// parent tier" tie-break never fires in practice; first-appearance order
+// (A's affixes before B's) is exactly the A-before-B rule.
 function mergeAffixes(a, b, newTier) {
   var map = {}, order = [];
   [a, b].forEach(function (parent) {
@@ -824,7 +853,9 @@ function renderBench() {
     d.className = 'slot tier' + it.tier;
     var icon = it.type === 'weapon' ? '⚔' : '🛡';
     var aff = affixText(it);
-    d.innerHTML = '<span>' + icon + '</span><span class="t' + it.tier + '">' +
+    // v21b: epic ★★★ items get a gold nameplate at all tiers.
+    var gold = goldNameplate(it) ? ' style="color:#facc15"' : '';
+    d.innerHTML = '<span>' + icon + '</span><span class="t' + it.tier + '"' + gold + '>' +
       (it.name || tierName(it.tier)) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>' +
       (aff ? '<span class="dim">' + aff + '</span>' : '');
     bench.appendChild(d);
@@ -1918,7 +1949,7 @@ drawMob(e, c);
   ctx.restore();
   // weapon name label under the rig
   var wTop = topItem('weapon');
-  ctx.fillStyle = wt === 0 ? '#00ff88' : tierColor(wt);
+  ctx.fillStyle = goldNameplate(wTop) ? '#facc15' : (wt === 0 ? '#00ff88' : tierColor(wt));
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
   var wsD = weaponStats();
@@ -2019,9 +2050,9 @@ function renderStats() {
   var lw = topWeaponTier(), la = topArmorTier();
   var wTop2 = topItem('weapon'), aTop2 = topItem('armor');
   document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style + ((wTop2 && affixText(wTop2)) ? ' · ' + affixText(wTop2) : '');
-  document.getElementById('loadoutW').style.color = lw === 0 ? '#00ff88' : tierColor(lw);
+  document.getElementById('loadoutW').style.color = goldNameplate(wTop2) ? '#facc15' : (lw === 0 ? '#00ff88' : tierColor(lw));
   document.getElementById('loadoutA').textContent = (aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL') + ((aTop2 && affixText(aTop2)) ? ' · ' + affixText(aTop2) : '');
-  document.getElementById('loadoutA').style.color = la === 0 ? '#00ff88' : tierColor(la);
+  document.getElementById('loadoutA').style.color = goldNameplate(aTop2) ? '#facc15' : (la === 0 ? '#00ff88' : tierColor(la));
   var gearPower = atk() + armorBonus();
   var threat = S.stage * 2 + 4;
   document.getElementById('threat').textContent = threat;
