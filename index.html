@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v21</title>
+<title>XPLOIT HERO — POC v21c</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v21b // 70-tier ladder — stage-scaled drops, affix scaling</div>
+  <div id="sub">POC v21c // 70-tier ladder — sets + retiered uniques</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -94,7 +94,7 @@
   </div>
   <div id="objective">GOAL: <b id="objText">jack in to start</b></div>
   <div class="panel">
-    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span></div>
+    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span><span>VER <b id="verLabel">v21c</b></span></div>
     <div class="row"><span>ATK <b id="atk">6</b> <span class="dim" id="atkBreak"></span></span><span>ARMOR <b id="armor">0</b></span></div>
     <div class="row"><span>DATA <b id="data">0</b>/<span id="dataNext">30</span></span><span>CRYPTO <b id="crypto" class="cyan">0</b></span></div>
     <div class="row"><span>HP <b id="heroHp">60/60</b></span><span>FOES <b id="foeCount">0</b></span></div>
@@ -251,6 +251,125 @@ function maxHpEff() { return S.maxHp + 10 * topAffixStacks('armor', 'bulwark'); 
 // (spec table max stacks 2; drop bonus caps at +20% at 2 stacks).
 function greedStacks() { return Math.min(2, topAffixStacks('weapon', 'greed') + topAffixStacks('armor', 'greed')); }
 
+// ---------- v21c: sets (v20 §2, verbatim) + chase uniques (v20 §3, retiered) ----------
+// Sets are a COLLECTION LOG, not held gear: bonuses are permanent and global
+// once unlocked, because auto-merge consumes pieces. A set tag rolls on 15%
+// of drops, is inherited 100% through merge from the name-parent, and the
+// log never shrinks. Uniques never merge, have fixed affixes + ★★★ (+4),
+// no set tag, and exist at most once per save.
+var SETS = ['GHOST', 'NEON', 'VOID'];
+var SET_CHIP = { GHOST: 'GST', NEON: 'NEO', VOID: 'VOI' };
+function setCount(set) { return (S.setLog && S.setLog[set]) || 0; }
+function rollSetTag() {
+  if (Math.random() < 0.15) return SETS[Math.floor(Math.random() * SETS.length)];
+  return null;
+}
+function recordSet(item) {
+  if (!item || !item.set) return;
+  if (!S.setSeen) S.setSeen = {};
+  if (S.setSeen[item.id]) return;
+  S.setSeen[item.id] = true;
+  if (!S.setLog) S.setLog = { GHOST: 0, NEON: 0, VOID: 0 };
+  S.setLog[item.set] = (S.setLog[item.set] || 0) + 1;
+}
+function setLogText() {
+  var g = setCount('GHOST'), n = setCount('NEON'), v = setCount('VOID');
+  var out = 'SETS: GHOST ' + g + '/4 · NEON ' + n + '/4 · VOID ' + v + '/4';
+  var act = [];
+  if (g >= 2) act.push('GHOST 2pc: +15% speed, -10% contact dmg');
+  if (g >= 4) act.push('GHOST 4pc: phase cloak (negate 1 hit / 20s), nova -25% cd');
+  if (n >= 2) act.push('NEON 2pc: +20% crypto, +10% kill Data');
+  if (n >= 4) act.push('NEON 4pc: +1 pierce, +15% shot dmg');
+  if (v >= 2) act.push('VOID 2pc: +12% shot dmg, Patch Up +5s');
+  if (v >= 4) act.push('VOID 4pc: kills 10% spawn void echo (50% atk, 10s)');
+  out += '\nSET BONUSES: ' + (act.length ? act.join(' | ') : 'none yet');
+  return out;
+}
+// Band base at a stage (v21 §1.1); null below stage 21 (no band there).
+function bandBaseFor(stage) { return stage >= 21 ? Math.min(70, stage - 11) : null; }
+var UNIQUES = {
+  vex: { name: "VEX'S INJECTOR", type: 'weapon',
+    affixes: [{ id: 'chain', stacks: 2 }, { id: 'vampiric', stacks: 1 }],
+    lore: "Vex's own injector. She left it in the dead-drop for whoever came looking." },
+  core: { name: 'CORRUPTED SINGULARITY CORE', type: 'weapon',
+    affixes: [{ id: 'overclocked', stacks: 2 }, { id: 'burn', stacks: 2 }],
+    lore: 'A Singularity core that looked back. It hits harder than anything you own. It also bites.' },
+  halcyon: { name: 'HALCYON AUDIT KIT', type: 'armor',
+    affixes: [{ id: 'bulwark', stacks: 2 }, { id: 'regen', stacks: 1 }],
+    lore: 'A clean audit kit from a job that stayed clean. Halcyon Logistics never knew how close it came.' },
+  lastlight: { name: 'LAST LIGHT PLATE', type: 'armor',
+    affixes: [{ id: 'thorns', stacks: 2 }],
+    lore: 'Plate that held when nothing else did. It remembers the one you almost lost.' }
+};
+function isUnique(item) { return !!(item && item.unique); }
+// Effective affix slots for an item: VEX gets +1 bonus slot over its band
+// table (v21 §6.2); every other item uses the band table. In v21c the bonus
+// slot is capacity only — VEX's affixes stay exactly its fixed pair (see
+// judgment calls in the build report); crafting (v21d) may use the slot.
+function itemSlots(item) { return affixSlots(item.tier) + (item.unique === 'vex' ? 1 : 0); }
+function uniqueItem(id, tier) {
+  var u = UNIQUES[id];
+  return { id: S.nextItemId++, type: u.type, tier: tier, name: u.name, bonus: 4, rarity: 3,
+    affixes: u.affixes.map(function (a) { return { id: a.id, stacks: a.stacks }; }), unique: id };
+}
+// Award path. Returns 'awarded' (bench), 'waiting' (bench-full pickup spawned,
+// ownership NOT yet set — a despawned wait re-fires via its trigger), or
+// 'converted' (already owned: 200 x tier crypto, direct — not multiplied by
+// NEON, because the spec amount is the consolation prize itself).
+function grantUnique(id, tier) {
+  if (S.uniques && S.uniques[id]) {
+    var conv = 200 * tier;
+    S.crypto += conv;
+    log('UNIQUE // ' + UNIQUES[id].name + ' already owned — converted to +' + conv + ' crypto');
+    return 'converted';
+  }
+  if (S.items.length >= 16) {
+    pickups.push({ x: hero.x, y: hero.y, unique: id, tier: tier, type: UNIQUES[id].type,
+      life: 60, bob: Math.random() * 6, age: 0, settle: 0.4 });
+    log('UNIQUE // ' + UNIQUES[id].name + ' waits — bench full, walk over it within 60s');
+    return 'waiting';
+  }
+  var item = uniqueItem(id, tier);
+  S.items.push(item);
+  if (!S.uniques) S.uniques = { vex: false, core: false, halcyon: false, lastlight: false };
+  S.uniques[id] = true;
+  AN.totals.bestTier = Math.max(AN.totals.bestTier, tier);
+  log('UNIQUE // ' + item.name + ' ★★★ · T' + tier + ' — ' + UNIQUES[id].lore);
+  return 'awarded';
+}
+function collectUnique(p) {
+  if (S.items.length >= 16) return null;
+  var item = uniqueItem(p.unique, p.tier);
+  S.items.push(item);
+  if (!S.uniques) S.uniques = { vex: false, core: false, halcyon: false, lastlight: false };
+  S.uniques[p.unique] = true;
+  AN.totals.bestTier = Math.max(AN.totals.bestTier, p.tier);
+  log('UNIQUE // ' + item.name + ' ★★★ · T' + p.tier + ' claimed');
+  return item;
+}
+// Crypto/Data earn paths. NEON 2-piece: +20% crypto from earn sources,
+// +10% Data from kills (applied in onKill). Scrap conversion (+10) and
+// unique duplicate conversion (200 x tier) are conversions, not earns,
+// and are deliberately NOT multiplied here.
+function addCrypto(n) {
+  var gained = Math.round(n * (1 + (setCount('NEON') >= 2 ? 0.20 : 0)));
+  S.crypto += gained;
+  return gained;
+}
+// Shot-damage multipliers from sets + CORE (auto-fire shots only; Inject
+// nova stays atk() x 4). VOID 2pc 1.12 x NEON 4pc 1.15 x CORE 1.5 = 1.93,
+// still under the v20 §2.2 x2.0 guard before uniques are counted.
+function setDmgMul() {
+  var m = 1;
+  if (setCount('VOID') >= 2) m *= 1.12;
+  if (setCount('NEON') >= 4) m *= 1.15;
+  var w = topItem('weapon');
+  if (w && w.unique === 'core') m *= 1.5;
+  return m;
+}
+var ghostCloakReadyAt = 0; // phase cloak: ready at start, then 20s cooldown
+var voidEchoUntil = 0, voidEchoLast = 0; // void echo pet: 10s, refreshes on proc
+
 var ENEMIES = ['DAEMON', 'MALWARE', 'WORM', 'TROJAN', 'ROOTKIT', 'SPYWARE'];
 // Stage themes: every sector looks different. Boss stages override to RED ALERT.
 var THEMES = [
@@ -361,6 +480,7 @@ function mobPoolFor(stage) {
   return [ENEMIES[stage % 6], ENEMIES[(stage + 2) % 6], ENEMIES[(stage + 4) % 6]];
 }
 var SAVE_KEY = 'xploit-hero-poc-v2';
+var GAME_VERSION = 'v21c'; // v21c: shown in the header stats row (VER) + #sub, updated per slice; save key never changes with it.
 var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR']];
 var KILLS_PER_STAGE = 5;
 var AC = null;
@@ -387,7 +507,17 @@ function blankState() {
     theme: 'neon-city', themeUnlocked: false,
     items: [], nextItemId: 1, autoMerge: true,
     injectReadyAt: 0, healReadyAt: 0,
-    arcStep: 0, nodeIdx: 0, ghostDone: false, ladderAnnounced: false
+    arcStep: 0, nodeIdx: 0, ghostDone: false, ladderAnnounced: false,
+    // v21c: sets + uniques. setLog counts DISTINCT pieces ever owned per set
+    // (never shrinks on merge); setSeen tracks counted item ids so a merged
+    // result inheriting a tag does not double-count. No live save has sets
+    // or uniques (v20b never shipped), so old saves start empty — no
+    // retroactive credit. uniques flags are ownership (for v21d prestige
+    // snapshot); the item itself lives in S.items. corePity counts boss
+    // kills at stages >= 30 since the last CORE award/convert.
+    setLog: { GHOST: 0, NEON: 0, VOID: 0 }, setSeen: {},
+    uniques: { vex: false, core: false, halcyon: false, lastlight: false },
+    corePity: 0, generalNodes: 0
   };
 }
 function rankFor(level) {
@@ -556,6 +686,7 @@ function load() {
     // v19a: saves that predate themes keep today's look (deep-terminal) until unlock
     if (p.theme === undefined) s.theme = 'deep-terminal';
     if (!AESTHETICS[s.theme]) s.theme = 'deep-terminal';
+    if (p.generalNodes === undefined) s.generalNodes = s.nodeIdx; // pre-v21c saves: nodeIdx IS the general-node count
     s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } if (!it.affixes) it.affixes = rollAffixes(it.type, it.tier); });
     return s;
   } catch (e) { return null; }
@@ -692,7 +823,9 @@ function gainData(n) {
 function addItem(type, tier) {
   if (S.items.length >= 16) { S.crypto += 10; log('bench full — scrap converted to +10 crypto'); return false; }
   var roll = rollItem(type, tier);
-  S.items.push({ id: S.nextItemId++, type: type, tier: tier, name: roll.name, bonus: roll.bonus, rarity: roll.rarity, affixes: rollAffixes(type, tier) });
+  var item = { id: S.nextItemId++, type: type, tier: tier, name: roll.name, bonus: roll.bonus, rarity: roll.rarity, affixes: rollAffixes(type, tier), set: rollSetTag() };
+  S.items.push(item);
+  recordSet(item);
   AN.totals.bestTier = Math.max(AN.totals.bestTier, tier);
   return true;
 }
@@ -729,23 +862,46 @@ function onKill(e, via) {
   // v19b: boss death shakes + flashes regardless of tier or source;
   // slow-mo is gated inside maybeSlowmo (t5 weapon kills only, never nova).
   if (e.boss) { triggerShake(4, 250); triggerFlash(0.35, 250); maybeSlowmo(e, via); }
-  log(e.name + ' breached // +' + (5 + S.stage) + ' crypto');
-  var cryptoGain = 5 + S.stage;
-  var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()));
-  S.crypto += cryptoGain;
+  var cryptoGain = addCrypto(5 + S.stage);
+  log(e.name + ' breached // +' + cryptoGain + ' crypto');
+  var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()) * (1 + (setCount('NEON') >= 2 ? 0.10 : 0)));
   gainData(dataGain);
   dropRoll(S.kills === 0, e.x, e.y, e.boss);
+  // v21c: VOID 4-piece echo proc on any kill (10%; refresh, never stack).
+  if (setCount('VOID') >= 4 && Math.random() < 0.10) {
+    var wasEcho = Date.now() < voidEchoUntil;
+    voidEchoUntil = Date.now() + 10000;
+    if (!wasEcho) log('VOID ECHO // a copy of you fights for 10s');
+  }
   S.kills += 1;
   if (e.boss || (waveSpawned >= waveTotal && enemies.length === 0)) {
-    var bonusC = 10 + S.stage * 2;
-    S.crypto += bonusC;
+    // v21c: clutch is judged on HP BEFORE the clear heal below.
+    var hpBeforeClear = S.heroHp, maxBeforeClear = maxHpEff();
+    var bonusC = addCrypto(10 + S.stage * 2);
     S.heroHp = maxHpEff();
+    // v21c: LAST LIGHT — clutch clear (stage >= 15, finished under 10% max HP).
+    // Stage 21+: band base; stages 15-20: max(T3, best top-item tier at clear).
+    if (S.stage >= 15 && hpBeforeClear < 0.10 * maxBeforeClear) {
+      var llTier = S.stage >= 21 ? bandBaseFor(S.stage) : Math.max(3, topWeaponTier(), topArmorTier());
+      grantUnique('lastlight', llTier);
+    }
     banner = { txt: 'SECTOR ' + S.stage + ' CLEARED' + (S.stage % 10 === 5 ? ' // MAINFRAME UNGUARDED' : ''), life: 2 };
     if (S.stage % 10 === 5) log('SECTOR ' + S.stage + ' CLEARED // +' + bonusC + ' crypto, hull restored — the mainframe is unguarded, walk to it');
     else log('SECTOR ' + S.stage + ' CLEARED // +' + bonusC + ' crypto, hull restored — next sector in 5s, breathe, patch up!');
     pendingStage = S.stage + 1;
     intermissionUntil = Date.now() + 5000;
     if (S.stage % 10 === 5) { intermissionUntil = 0; nodePending = true; if (!world.some(function (o) { return o.kind === 'server'; })) { world.push({ kind: 'server', x: hero.x + 170, y: hero.y, r: 26 }); log('MAINFRAME // signal relocated — walk to it'); } }
+    // v21c: CORRUPTED SINGULARITY CORE — boss kills at stages >= 30, 20% per
+    // kill, pity at the 5th. A successful roll while already owned converts
+    // (grantUnique); a bench-full wait does NOT reset pity, so a despawned
+    // wait re-fires on the next qualifying boss kill.
+    if (e.boss && S.stage >= 30) {
+      S.corePity = (S.corePity || 0) + 1;
+      if (Math.random() < 0.20 || S.corePity >= 5) {
+        var coreRes = grantUnique('core', bandBaseFor(S.stage) || 5);
+        if (coreRes === 'awarded' || coreRes === 'converted') S.corePity = 0;
+      }
+    }
     // v19a fallback: first boss kill unlocks the theme switcher too (node-skippers)
     if (e.boss && !S.themeUnlocked) {
       S.themeUnlocked = true;
@@ -815,6 +971,7 @@ function moveDir() {
 // ---------- controls ----------
 function tryMerge(a, b) {
   if (!a || !b || a.id === b.id) return false;
+  if (a.unique || b.unique) return false; // v21c: uniques never merge
   if (a.type !== b.type || a.tier !== b.tier || a.tier >= 70) return false;
   S.items = S.items.filter(function (it) { return it.id !== a.id && it.id !== b.id; });
   var newTier = a.tier + 1;
@@ -824,7 +981,12 @@ function tryMerge(a, b) {
   var parent = (b.bonus || 0) > (a.bonus || 0) ? b : a;
   var rarity = [0, 1, 2, 4].indexOf(bonus);
   if (rarity < 0) rarity = 0;
-  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || tierName(newTier), bonus: bonus, rarity: rarity, affixes: m.affixes });
+  // v21c: set tag inherits 100% from the name-parent (null if it has none);
+  // the merged item is the parent's lineage, not a new piece, so a counted
+  // parent transfers its seen mark instead of incrementing the log.
+  var parentSeen = !!(S.setSeen && S.setSeen[parent.id]);
+  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || tierName(newTier), bonus: bonus, rarity: rarity, affixes: m.affixes, set: parent.set || null });
+  if (S.items[S.items.length - 1].set && parentSeen) S.setSeen[S.items[S.items.length - 1].id] = true;
   AN.totals.bestTier = Math.max(AN.totals.bestTier, newTier);
   m.dropped.forEach(function () { gainData(5); });
   log('MERGED // ' + tierName(newTier) + ' ' + parent.name + stars(rarity) + ' forged' +
@@ -839,7 +1001,7 @@ function autoMergeAll() {
     outer: for (var i = 0; i < S.items.length; i++) {
       for (var j = i + 1; j < S.items.length; j++) {
         var a = S.items[i], b = S.items[j];
-        if (a.type === b.type && a.tier === b.tier && a.tier < 70) { tryMerge(a, b); n += 1; again = true; break outer; }
+        if (a.type === b.type && a.tier === b.tier && a.tier < 70) { if (tryMerge(a, b)) { n += 1; again = true; break outer; } }
       }
     }
   }
@@ -857,6 +1019,7 @@ function renderBench() {
     var gold = goldNameplate(it) ? ' style="color:#facc15"' : '';
     d.innerHTML = '<span>' + icon + '</span><span class="t' + it.tier + '"' + gold + '>' +
       (it.name || tierName(it.tier)) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>' +
+      (it.set ? '<span class="dim">' + SET_CHIP[it.set] + '</span>' : '') +
       (aff ? '<span class="dim">' + aff + '</span>' : '');
     bench.appendChild(d);
   });
@@ -1111,12 +1274,14 @@ function termSubmit() {
     if (!nodeRewarded) {
       nodeRewarded = true;
       termPrint('FUSE // ' + nodeCurrent.lesson);
-      termPrint('NODE BREACHED // +75 crypto +60 data. Hit CONTINUE to keep pushing.');
-      S.crypto += 75;
+      // v21c: HALCYON AUDIT KIT (top armor only) pays +25% node Data: 60 -> 75.
+      var nodeData = (topItem('armor') && topItem('armor').unique === 'halcyon') ? 75 : 60;
+      var nodeCrypto = addCrypto(75);
+      termPrint('NODE BREACHED // +' + nodeCrypto + ' crypto +' + nodeData + ' data. Hit CONTINUE to keep pushing.');
       AN.totals.nodesBreached += 1;
-      gainData(60);
+      gainData(nodeData);
       ding();
-      log('STORY NODE // ' + nodeCurrent.title + ' breached — +75 crypto +60 data');
+      log('STORY NODE // ' + nodeCurrent.title + ' breached — +' + nodeCrypto + ' crypto +' + nodeData + ' data');
       // v19a: first node completion unlocks the theme switcher (style.css lesson)
       if (!S.themeUnlocked) {
         S.themeUnlocked = true;
@@ -1126,6 +1291,13 @@ function termSubmit() {
       if (nodeCurrent.arc === 'ghost') {
         S.arcStep += 1;
         log('GHOST TRAIL // beat ' + nodeCurrent.beat + ' of 4 cleared');
+        if (nodeCurrent.beat === 4) {
+          // v21c: VEX'S INJECTOR at the current band base (stage 35 -> T24).
+          // Unguarded on purpose: grantUnique converts if already owned, so
+          // a re-driven beat 4 pays 200 x tier instead of duplicating. In
+          // normal play beat 4 fires once (arcStep never returns to it).
+          grantUnique('vex', bandBaseFor(S.stage) || 4);
+        }
         if (S.arcStep >= GHOST_NODES.length) {
           S.ghostDone = true;
           log('GHOST TRAIL // CASE CLOSED — Vex is safe');
@@ -1133,6 +1305,14 @@ function termSubmit() {
         save();
       } else {
         S.nodeIdx += 1;
+        S.generalNodes += 1;
+        // v21c: HALCYON AUDIT KIT at the 10th general node (Ghost beats do
+        // not count; catch-up: any later general node also fires if the
+        // 10th was passed before v21c). Guarded by !owned so later nodes
+        // never re-convert — conversion is via grantUnique directly.
+        if (S.generalNodes >= 10 && !(S.uniques && S.uniques.halcyon)) {
+          grantUnique('halcyon', bandBaseFor(S.stage) || 4);
+        }
         save();
       }
       document.getElementById('termCloseBtn').textContent = 'CONTINUE';
@@ -1196,7 +1376,7 @@ document.getElementById('injectBtn').onclick = function () {
     }
   });
   world = world.filter(function (o) { return !o.gone; });
-  S.injectReadyAt = now + 10000;
+  S.injectReadyAt = now + (setCount('GHOST') >= 4 ? 7500 : 10000);
   log((hit ? ('INJECT NOVA // hit ' + hit + ' foes') : 'INJECT NOVA // nothing in range — get closer') + (barrelHits ? (', smashed ' + barrelHits + ' barrel' + (barrelHits === 1 ? '' : 's')) : ''));
   var dead = enemies.filter(function (e) { return e.hp <= 0; });
   enemies = enemies.filter(function (e) { return e.hp > 0; });
@@ -1207,8 +1387,8 @@ document.getElementById('healBtn').onclick = function () {
   var now = Date.now();
   if (now < S.healReadyAt) return;
   S.heroHp = Math.min(maxHpEff(), S.heroHp + maxHpEff() * 0.5);
-  S.healReadyAt = now + 25000;
-  log('PATCH UP // +50% hull (25s recharge)');
+  S.healReadyAt = now + (setCount('VOID') >= 2 ? 30000 : 25000);
+  log('PATCH UP // +50% hull (' + (setCount('VOID') >= 2 ? '30s' : '25s') + ' recharge)');
 };
 document.getElementById('statsBtn').onclick = function () {
   var sb = document.getElementById('statsBox');
@@ -2036,6 +2216,7 @@ drawMob(e, c);
   }
 }
 function renderStats() {
+  document.getElementById('verLabel').textContent = GAME_VERSION;
   document.getElementById('rank').textContent = rankFor(S.level);
   document.getElementById('lvl').textContent = S.level;
   document.getElementById('stage').textContent = S.stage;
@@ -2049,9 +2230,9 @@ function renderStats() {
   document.getElementById('foeCount').textContent = enemies.length;
   var lw = topWeaponTier(), la = topArmorTier();
   var wTop2 = topItem('weapon'), aTop2 = topItem('armor');
-  document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style + ((wTop2 && affixText(wTop2)) ? ' · ' + affixText(wTop2) : '');
+  document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style + ((wTop2 && affixText(wTop2)) ? ' · ' + affixText(wTop2) : '') + ((wTop2 && wTop2.set) ? ' · ' + SET_CHIP[wTop2.set] : '');
   document.getElementById('loadoutW').style.color = goldNameplate(wTop2) ? '#facc15' : (lw === 0 ? '#00ff88' : tierColor(lw));
-  document.getElementById('loadoutA').textContent = (aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL') + ((aTop2 && affixText(aTop2)) ? ' · ' + affixText(aTop2) : '');
+  document.getElementById('loadoutA').textContent = (aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL') + ((aTop2 && affixText(aTop2)) ? ' · ' + affixText(aTop2) : '') + ((aTop2 && aTop2.set) ? ' · ' + SET_CHIP[aTop2.set] : '');
   document.getElementById('loadoutA').style.color = goldNameplate(aTop2) ? '#facc15' : (la === 0 ? '#00ff88' : tierColor(la));
   var gearPower = atk() + armorBonus();
   var threat = S.stage * 2 + 4;
@@ -2077,7 +2258,7 @@ function renderStats() {
   if (sb && sb.style.display !== 'none') {
     var avg = AN.totals.sessions > 0 ? Math.round(AN.totals.playSecs / AN.totals.sessions / 60) : 0;
     var f = AN.funnel;
-    sb.textContent = 'PLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? tierName(AN.totals.bestTier) : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
+    sb.textContent = setLogText() + '\nPLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? tierName(AN.totals.bestTier) : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
   }
 }
 function nearestInRange(range) {
@@ -2090,6 +2271,8 @@ function nearestInRange(range) {
 }
 function update(dt, ts) {
   if (!started) return;
+  // v21c: GHOST 2-piece move speed 175 -> 201 (measurable in hero.speed).
+  hero.speed = setCount('GHOST') >= 2 ? 201 : 175;
   // v20a: top armor changed (merge/drop) — never hold HP above the new max
   if (S.heroHp > maxHpEff()) S.heroHp = maxHpEff();
   // intermission: breathe between sectors — patch up
@@ -2210,8 +2393,9 @@ function update(dt, ts) {
   if (!nodePending && ts - lastFire > fireInt) {
     var t = nearestInRange(ws.range);
     if (t) {
-      var dmg = Math.round(atk() * (1 + 0.08 * ovk));
-      var prc = topAffixStacks('weapon', 'piercing');
+      var dmg = Math.round(atk() * (1 + 0.08 * ovk) * setDmgMul());
+      // v21c: NEON 4-piece +1 pierce; pierce from all sources caps at 5.
+      var prc = Math.min(5, topAffixStacks('weapon', 'piercing') + (setCount('NEON') >= 4 ? 1 : 0));
       var chn = topAffixStacks('weapon', 'chain');
       var brn = topAffixStacks('weapon', 'burn');
       var frs = topAffixStacks('weapon', 'frost');
@@ -2286,6 +2470,9 @@ function update(dt, ts) {
       if (ft === 3) triggerShake(2, 120);
       if (ft === 5) { triggerShake(4, 180); triggerFlash(0.22, 150); }
       if (ws.splash > 0) bursts.push({ x: t.x, y: t.y, life: 0.4, max: 0.4, color: topWeaponTier() === 0 ? '#00ff88' : tierColor(topWeaponTier()), R: ws.splash });
+      // v21c: CORRUPTED SINGULARITY CORE bleed — 3 HP per shot fired,
+      // floored at 1 HP (it can never kill you).
+      if (topItem('weapon') && topItem('weapon').unique === 'core') S.heroHp = Math.max(1, S.heroHp - 3);
       lastFire = ts;
       var dead = enemies.filter(function (e) { return e.hp <= 0; });
       enemies = enemies.filter(function (e) { return e.hp > 0; });
@@ -2297,6 +2484,23 @@ function update(dt, ts) {
         }
         onKill(e);
       });
+    }
+  }
+  // v21c: VOID echo — with VOID 4-piece, kills have a 10% chance (in onKill)
+  // to raise an echo for 10s (a proc while one lives refreshes the timer).
+  // It fires at the weapon interval for 50% of atk; its kills go through
+  // onKill like any other kill. No visual beyond its hit floaters.
+  if (!nodePending && Date.now() < voidEchoUntil && ts - voidEchoLast > fireInt) {
+    var et = nearestInRange(ws.range);
+    if (et) {
+      var edmg = Math.round(atk() * 0.5);
+      et.hp -= edmg;
+      floaters.push({ x: et.x, y: et.y - et.r - 8, txt: 'ECHO -' + edmg, color: '#818cf8', life: 1 });
+      voidEchoLast = ts;
+      if (et.hp <= 0) {
+        enemies = enemies.filter(function (e) { return e !== et; });
+        onKill(et, 'echo');
+      }
     }
   }
   // SPACE fires Inject Nova (same as the button; typing in an input never triggers it)
@@ -2359,6 +2563,21 @@ function update(dt, ts) {
     var hd = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
     if (hd < e.r + hero.r && e.hitCd <= 0 && e.hp > 0 && Date.now() >= spawnProtectUntil) {
       var dmg = Math.max(1, e.dmg - armorBonus() - topAffixStacks('armor', 'bulwark'));
+      // v21c: GHOST 2-piece contact damage -10% (multiplicative, after armor
+      // and BULWARK, floor 1); GHOST 4-piece phase cloak negates the first
+      // hit in each 20s window entirely (no damage, no knockback).
+      if (setCount('GHOST') >= 2) dmg = Math.max(1, Math.round(dmg * 0.9));
+      var cloaked = false;
+      if (setCount('GHOST') >= 4 && Date.now() >= ghostCloakReadyAt) {
+        cloaked = true;
+        ghostCloakReadyAt = Date.now() + 20000;
+      }
+      if (cloaked) {
+        e.hitCd = 0.9;
+        armorFlashUntil = Date.now() + 100;
+        floaters.push({ x: hero.x, y: hero.y - 24, txt: 'CLOAK', color: '#00e5ff', life: 1 });
+        log('PHASE CLOAK // hit negated');
+      } else {
       S.heroHp -= dmg;
       var thr = topAffixStacks('armor', 'thorns');
       if (thr > 0 && !e.boss) e.hp -= Math.round(dmg * 0.15 * thr);
@@ -2379,6 +2598,7 @@ function update(dt, ts) {
         banner = { txt: 'RIG DOWN — respawned, breathe (3s shield)', life: 2 };
         log('rig down // foes scattered around you, 3s shield, -' + lost + ' crypto');
       }
+      } // v21c: end of non-cloaked contact-damage branch
     }
   });
   enemies = enemies.filter(function (e) { return !e.leaving || e.leaving > 0; });
@@ -2409,6 +2629,26 @@ function update(dt, ts) {
     var pd = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
     if (pd < 90) { p.x += pdx / pd * 220 * dt; p.y += pdy / pd * 220 * dt; }
     if (pd < hero.r + 16) {
+      if (p.unique) {
+        // v21c: unique pickup — bench-full waits 60s instead of converting
+        // (life refreshed on each throttled retry; the magnet pulls it back,
+        // so it stays reachable). Ownership is set only on collection.
+        if (S.items.length >= 16) {
+          if (!p.waitUntil || Date.now() >= p.waitUntil) {
+            p.waitUntil = Date.now() + 1000;
+            p.life = Math.max(p.life, 60);
+            log('bench full — unique waits (60s)');
+          }
+        } else {
+          p.taken = true;
+          var uitem = collectUnique(p);
+          floaters.push({ x: p.x, y: p.y - 10, txt: uitem ? ('+' + uitem.name + ' ★★★') : '+10 crypto', color: '#facc15', life: 1 });
+          bursts.push({ x: p.x, y: p.y, life: 0.4, max: 0.4, color: '#facc15' });
+          blip();
+          renderBench();
+          autoMergeAll();
+        }
+      } else {
       p.taken = true;
       var got = addItem(p.type, p.tier);
       var gotItem = got ? S.items[S.items.length - 1] : null;
@@ -2417,6 +2657,7 @@ function update(dt, ts) {
       blip();
       renderBench();
       autoMergeAll();
+      }
     }
   });
   pickups = pickups.filter(function (p) { return !p.taken && p.life > 0; });

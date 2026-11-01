@@ -7,12 +7,12 @@ commands.
 
 ## ▶️ Play now — one tap
 
-**Latest: v21b**
+**Latest: v21c**
 
-[Play XPLOIT HERO v21b](https://loganbek.github.io/xploit-hero/?v=21b)
+[Play XPLOIT HERO v21c](https://loganbek.github.io/xploit-hero/?v=21c)
 
 Opens the latest build right in your browser — no install, no account.
-Your save carries over. The `?v=21b` on the link busts the browser cache
+Your save carries over. The `?v=21c` on the link busts the browser cache
 and tells you which version you're opening — if the game itself still
 shows an older version, that link is stale and needs updating on the
 next release.
@@ -41,15 +41,15 @@ account, no server. Your progress saves in the browser's local storage.
 
 ## Roadmap
 
-- Live now (v21b): the gear ladder grows to ~70 tiers ("laughably
+- Live now (v21c): the gear ladder grows to ~70 tiers ("laughably
   large"), with stage-scaled drops so high stages drop high tiers
-  directly, affix slots/caps scaling by tier band, and gold ★★★
-  nameplates. Plus v20a's 10-affix loot system and v19's four world
-  themes (Neon City, Deep Terminal, Synthwave Vector, Glitch Void)
-  with a toggle.
-- In progress: v21c — sets + retiered chase uniques, then v21d
-  (crafting caps / paragon / prestige) and v21e (inventory + rank-up
-  ding).
+  directly, affix slots/caps scaling by tier band, gold ★★★
+  nameplates, three gear sets (GHOST / NEON / VOID) with a collection
+  log, and retiered chase uniques. Plus v20a's 10-affix loot system
+  and v19's four world themes (Neon City, Deep Terminal, Synthwave
+  Vector, Glitch Void) with a toggle.
+- In progress: v21d — crafting caps / paragon / prestige, then v21e
+  (inventory + rank-up ding).
 - Backend v2: logins (Google + GitHub first, then Facebook), server save
   sync, multiplayer (crews, chat, crew boss, leaderboard). Still free,
   still playable offline.
