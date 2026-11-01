@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v19</title>
+<title>XPLOIT HERO — POC v20</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -123,6 +123,7 @@
 'use strict';
 // ---------- XPLOIT HERO POC v19 ----------
 // v19a: theme system + toggle (four aesthetics, CSS-unlock story). No VFX ladder yet (v19b).
+// v20a: affixes (spec section 1) — top-item-only power, auto-merge inheritance, migration.
 // Third-person auto-battler with movement, XP-Hero-style:
 // player steers (drag / WASD / arrows), rig auto-fires at nearest foe.
 // Start: level 0 NOOB -> climb to ELITE HAXZOR. Boss every 10 stages.
@@ -140,6 +141,79 @@ function rollItem(type, tier) {
   return { name: NAME_PREFIX[Math.floor(Math.random() * NAME_PREFIX.length)] + ' ' + core, bonus: [0, 1, 2, 4][rarity], rarity: rarity };
 }
 function stars(r) { return r === 0 ? '' : (r === 1 ? ' ★' : (r === 2 ? ' ★★' : ' ★★★')); }
+
+// v20a: affixes — player-side power on the TOP weapon / TOP armor only.
+// Slots: T1-T2 = 1, T3-T5 = 2. Stack cap per affix = min(3, tier).
+// Magnitudes are fixed per stack; tier scales capacity, never magnitude.
+var AFFIX_DEFS = {
+  vampiric: { abbr: 'VAM', type: 'weapon' },
+  overclocked: { abbr: 'OVK', type: 'weapon' },
+  piercing: { abbr: 'PRC', type: 'weapon' },
+  chain: { abbr: 'CHN', type: 'weapon' },
+  burn: { abbr: 'BRN', type: 'weapon' },
+  frost: { abbr: 'FRS', type: 'weapon' },
+  bulwark: { abbr: 'BLW', type: 'armor' },
+  regen: { abbr: 'RGN', type: 'armor' },
+  thorns: { abbr: 'THR', type: 'armor' },
+  greed: { abbr: 'GRD', type: 'either' }
+};
+var WEAPON_AFFIX_POOL = ['vampiric', 'overclocked', 'piercing', 'chain', 'burn', 'frost', 'greed'];
+var ARMOR_AFFIX_POOL = ['bulwark', 'regen', 'thorns', 'greed'];
+function affixSlots(tier) { return tier <= 2 ? 1 : 2; }
+function affixCap(tier) { return Math.min(3, tier); }
+function affixStacks(item, id) {
+  var n = 0;
+  (item.affixes || []).forEach(function (a) { if (a.id === id) n += a.stacks; });
+  return n;
+}
+function topAffixStacks(type, id) { var it = topItem(type); return it ? affixStacks(it, id) : 0; }
+function affixText(item) {
+  return (item.affixes || []).map(function (a) { return AFFIX_DEFS[a.id].abbr + '×' + a.stacks; }).join(' ');
+}
+function rollAffixes(type, tier) {
+  var pool = type === 'weapon' ? WEAPON_AFFIX_POOL : ARMOR_AFFIX_POOL;
+  var out = [];
+  function addOne() {
+    var ids = pool.filter(function (id) { return !out.some(function (a) { return a.id === id; }); });
+    if (!ids.length) return;
+    var id = ids[Math.floor(Math.random() * ids.length)];
+    var stacks = 1;
+    if (tier >= 2 && Math.random() < 0.25) stacks = 2;
+    if (stacks > affixCap(tier)) stacks = affixCap(tier);
+    out.push({ id: id, stacks: stacks });
+  }
+  if (tier <= 2) { if (Math.random() < 0.40) addOne(); }
+  else { addOne(); if (Math.random() < 0.50) addOne(); }
+  return out;
+}
+// v20a merge inheritance (spec 1.3): union, shared stacks add to the new
+// tier's cap, slot overflow keeps highest stacks (ties: A before B) and
+// refunds +5 Data per dropped affix. Star bonus = max, never rerolled.
+function mergeAffixes(a, b, newTier) {
+  var map = {}, order = [];
+  [a, b].forEach(function (parent) {
+    (parent.affixes || []).forEach(function (af) {
+      if (!(af.id in map)) { map[af.id] = { id: af.id, stacks: 0, first: order.length }; order.push(af.id); }
+      map[af.id].stacks += af.stacks;
+    });
+  });
+  var cap = affixCap(newTier);
+  var list = order.map(function (id) { var x = map[id]; x.stacks = Math.min(x.stacks, cap); return x; });
+  list.sort(function (x, y) { return y.stacks - x.stacks || x.first - y.first; });
+  var slots = affixSlots(newTier);
+  var kept = list.slice(0, slots), dropped = list.slice(slots);
+  kept.sort(function (x, y) { return x.first - y.first; });
+  return {
+    affixes: kept.map(function (x) { return { id: x.id, stacks: x.stacks }; }),
+    dropped: dropped.map(function (x) { return { id: x.id, stacks: x.stacks }; })
+  };
+}
+// v20a: effective max HP = base max HP + 10 per BULWARK stack on top armor.
+function maxHpEff() { return S.maxHp + 10 * topAffixStacks('armor', 'bulwark'); }
+// v20a: GREED counts from top weapon + top armor, capped at 2 stacks total
+// (spec table max stacks 2; drop bonus caps at +20% at 2 stacks).
+function greedStacks() { return Math.min(2, topAffixStacks('weapon', 'greed') + topAffixStacks('armor', 'greed')); }
+
 var ENEMIES = ['DAEMON', 'MALWARE', 'WORM', 'TROJAN', 'ROOTKIT', 'SPYWARE'];
 // Stage themes: every sector looks different. Boss stages override to RED ALERT.
 var THEMES = [
@@ -395,7 +469,7 @@ function currentTimeScale() {
 function maybeSlowmo(e, via) {
   // v19b: slow-mo ONLY on a t5 weapon boss kill — never on normal kills,
   // nova kills, node completions, or any other tier.
-  if (reducedMotion || !e.boss || via === 'nova') return;
+  if (reducedMotion || !e.boss || via === 'nova' || via === 'dot') return;
   if (topWeaponTier() !== 5) return;
   var now = Date.now();
   slowmoUntil = now + 400; slowmoEaseUntil = now + 500;
@@ -414,7 +488,7 @@ function playShotSound(tier) {
 var banner = null;
 var keys = {};
 var joy = null; // {ox, oy, dx, dy}
-var lastFire = 0, lastSpawn = 0, lastSave = 0, lastRegen = 0, lastTime = 0;
+var lastFire = 0, lastSpawn = 0, lastSave = 0, lastRegen = 0, lastRgn = 0, lastTime = 0;
 var pendingStage = 0, intermissionUntil = 0, spawnProtectUntil = 0;
 var waveTotal = 5, waveSpawned = 0;
 function resetWave() {
@@ -437,7 +511,7 @@ function load() {
     // v19a: saves that predate themes keep today's look (deep-terminal) until unlock
     if (p.theme === undefined) s.theme = 'deep-terminal';
     if (!AESTHETICS[s.theme]) s.theme = 'deep-terminal';
-    s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } });
+    s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } if (!it.affixes) it.affixes = rollAffixes(it.type, it.tier); });
     return s;
   } catch (e) { return null; }
 }
@@ -561,7 +635,7 @@ function gainData(n) {
     AN.totals.bestLevel = Math.max(AN.totals.bestLevel, S.level);
     S.baseAtk += 3;
     S.maxHp += 12;
-    S.heroHp = S.maxHp;
+    S.heroHp = maxHpEff();
     log('LEVEL UP // now LVL ' + S.level + ' ' + rankFor(S.level) + ', ATK +3');
     ding();
   }
@@ -569,12 +643,12 @@ function gainData(n) {
 function addItem(type, tier) {
   if (S.items.length >= 16) { S.crypto += 10; log('bench full — scrap converted to +10 crypto'); return false; }
   var roll = rollItem(type, tier);
-  S.items.push({ id: S.nextItemId++, type: type, tier: tier, name: roll.name, bonus: roll.bonus, rarity: roll.rarity });
+  S.items.push({ id: S.nextItemId++, type: type, tier: tier, name: roll.name, bonus: roll.bonus, rarity: roll.rarity, affixes: rollAffixes(type, tier) });
   AN.totals.bestTier = Math.max(AN.totals.bestTier, tier);
   return true;
 }
 function dropRoll(firstBlood, x, y) {
-  var chance = firstBlood ? 1 : 0.6;
+  var chance = firstBlood ? 1 : Math.min(1, 0.6 + 0.10 * greedStacks());
   if (Math.random() < chance) {
     var type = Math.random() < 0.5 ? 'weapon' : 'armor';
     var tier = 1;
@@ -592,7 +666,7 @@ function onKill(e, via) {
   if (e.boss) { triggerShake(4, 250); triggerFlash(0.35, 250); maybeSlowmo(e, via); }
   log(e.name + ' breached // +' + (5 + S.stage) + ' crypto');
   var cryptoGain = 5 + S.stage;
-  var dataGain = 8 + S.stage * 2;
+  var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()));
   S.crypto += cryptoGain;
   gainData(dataGain);
   dropRoll(S.kills === 0, e.x, e.y);
@@ -600,7 +674,7 @@ function onKill(e, via) {
   if (e.boss || (waveSpawned >= waveTotal && enemies.length === 0)) {
     var bonusC = 10 + S.stage * 2;
     S.crypto += bonusC;
-    S.heroHp = S.maxHp;
+    S.heroHp = maxHpEff();
     banner = { txt: 'SECTOR ' + S.stage + ' CLEARED' + (S.stage % 10 === 5 ? ' // MAINFRAME UNGUARDED' : ''), life: 2 };
     if (S.stage % 10 === 5) log('SECTOR ' + S.stage + ' CLEARED // +' + bonusC + ' crypto, hull restored — the mainframe is unguarded, walk to it');
     else log('SECTOR ' + S.stage + ' CLEARED // +' + bonusC + ' crypto, hull restored — next sector in 5s, breathe, patch up!');
@@ -678,10 +752,18 @@ function tryMerge(a, b) {
   if (!a || !b || a.id === b.id) return false;
   if (a.type !== b.type || a.tier !== b.tier || a.tier >= 5) return false;
   S.items = S.items.filter(function (it) { return it.id !== a.id && it.id !== b.id; });
-  var roll = rollItem(a.type, a.tier + 1);
-  S.items.push({ id: S.nextItemId++, type: a.type, tier: a.tier + 1, name: roll.name, bonus: roll.bonus, rarity: roll.rarity });
-  AN.totals.bestTier = Math.max(AN.totals.bestTier, a.tier + 1);
-  log('MERGED // ' + TIER_NAMES[a.tier] + ' ' + roll.name + stars(roll.rarity) + ' forged');
+  var newTier = a.tier + 1;
+  var m = mergeAffixes(a, b, newTier);
+  // v20a: star bonus = max of parents (no reroll); name = higher-star parent, tie -> A
+  var bonus = Math.max(a.bonus || 0, b.bonus || 0);
+  var parent = (b.bonus || 0) > (a.bonus || 0) ? b : a;
+  var rarity = [0, 1, 2, 4].indexOf(bonus);
+  if (rarity < 0) rarity = 0;
+  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || TIER_NAMES[newTier - 1], bonus: bonus, rarity: rarity, affixes: m.affixes });
+  AN.totals.bestTier = Math.max(AN.totals.bestTier, newTier);
+  m.dropped.forEach(function () { gainData(5); });
+  log('MERGED // ' + TIER_NAMES[a.tier] + ' ' + parent.name + stars(rarity) + ' forged' +
+    (m.dropped.length ? (' // slot overflow: ' + m.dropped.map(function (d) { return AFFIX_DEFS[d.id].abbr + '×' + d.stacks; }).join(' ') + ' refunded +5 Data each') : ''));
   renderBench();
   return true;
 }
@@ -705,8 +787,10 @@ function renderBench() {
     var d = document.createElement('div');
     d.className = 'slot tier' + it.tier;
     var icon = it.type === 'weapon' ? '⚔' : '🛡';
+    var aff = affixText(it);
     d.innerHTML = '<span>' + icon + '</span><span class="t' + it.tier + '">' +
-      (it.name || TIER_NAMES[it.tier - 1]) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>';
+      (it.name || TIER_NAMES[it.tier - 1]) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>' +
+      (aff ? '<span class="dim">' + aff + '</span>' : '');
     bench.appendChild(d);
   });
   for (var i = S.items.length; i < 16; i++) {
@@ -1056,7 +1140,7 @@ document.getElementById('injectBtn').onclick = function () {
 document.getElementById('healBtn').onclick = function () {
   var now = Date.now();
   if (now < S.healReadyAt) return;
-  S.heroHp = Math.min(S.maxHp, S.heroHp + S.maxHp * 0.5);
+  S.heroHp = Math.min(maxHpEff(), S.heroHp + maxHpEff() * 0.5);
   S.healReadyAt = now + 25000;
   log('PATCH UP // +50% hull (25s recharge)');
 };
@@ -1810,7 +1894,7 @@ drawMob(e, c);
   ctx.fillStyle = '#052e1a';
   ctx.fillRect(hero.x - 22, hero.y + 30, 44, 6);
   ctx.fillStyle = '#00ff88';
-  ctx.fillRect(hero.x - 22, hero.y + 30, Math.max(0, 44 * (S.heroHp / S.maxHp)), 6);
+  ctx.fillRect(hero.x - 22, hero.y + 30, Math.max(0, 44 * (S.heroHp / maxHpEff())), 6);
   ctx.globalAlpha = 1;
   ctx.restore();
   // v19b: screen flash — after the world section, before UI, decaying linearly
@@ -1834,7 +1918,7 @@ drawMob(e, c);
     ctx.font = '10px monospace';
   }
   // low-HP danger vignette
-  if (S.heroHp / S.maxHp < 0.3) {
+  if (S.heroHp / maxHpEff() < 0.3) {
     ctx.strokeStyle = '#ff2d95';
     ctx.globalAlpha = 0.35 + 0.25 * Math.sin(Date.now() / 200);
     ctx.lineWidth = 4;
@@ -1895,13 +1979,13 @@ function renderStats() {
   document.getElementById('data').textContent = S.data;
   document.getElementById('dataNext').textContent = dataNext();
   document.getElementById('crypto').textContent = S.crypto;
-  document.getElementById('heroHp').textContent = Math.max(0, Math.ceil(S.heroHp)) + '/' + S.maxHp;
+  document.getElementById('heroHp').textContent = Math.max(0, Math.ceil(S.heroHp)) + '/' + maxHpEff();
   document.getElementById('foeCount').textContent = enemies.length;
   var lw = topWeaponTier(), la = topArmorTier();
   var wTop2 = topItem('weapon'), aTop2 = topItem('armor');
-  document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style;
+  document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style + ((wTop2 && affixText(wTop2)) ? ' · ' + affixText(wTop2) : '');
   document.getElementById('loadoutW').style.color = lw === 0 ? '#00ff88' : TIER_COLORS[lw - 1];
-  document.getElementById('loadoutA').textContent = aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL';
+  document.getElementById('loadoutA').textContent = (aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL') + ((aTop2 && affixText(aTop2)) ? ' · ' + affixText(aTop2) : '');
   document.getElementById('loadoutA').style.color = la === 0 ? '#00ff88' : TIER_COLORS[la - 1];
   var gearPower = atk() + armorBonus();
   var threat = S.stage * 2 + 4;
@@ -1940,6 +2024,8 @@ function nearestInRange(range) {
 }
 function update(dt, ts) {
   if (!started) return;
+  // v20a: top armor changed (merge/drop) — never hold HP above the new max
+  if (S.heroHp > maxHpEff()) S.heroHp = maxHpEff();
   // intermission: breathe between sectors — patch up
   if (intermissionUntil) {
     if (Date.now() >= intermissionUntil) {
@@ -2046,27 +2132,75 @@ function update(dt, ts) {
     lastSpawn = ts;
   }
   // auto-fire: weapon tiers shoot differently (paused while a node terminal is open)
+  // v20a: top-weapon affixes apply here — OVK damage/interval, PRC pierce,
+  // CHN chain arcs, BRN burn, FRS slow, VAM leech. No-affix behavior is unchanged.
   var ws = weaponStats();
-  if (!nodePending && ts - lastFire > ws.int) {
+  var ovk = topAffixStacks('weapon', 'overclocked');
+  var fireInt = ws.int * (1 - 0.03 * ovk);
+  if (!nodePending && ts - lastFire > fireInt) {
     var t = nearestInRange(ws.range);
     if (t) {
-      var dmg = atk();
-      var hitList = [t];
+      var dmg = Math.round(atk() * (1 + 0.08 * ovk));
+      var prc = topAffixStacks('weapon', 'piercing');
+      var chn = topAffixStacks('weapon', 'chain');
+      var brn = topAffixStacks('weapon', 'burn');
+      var frs = topAffixStacks('weapon', 'frost');
+      var vam = topAffixStacks('weapon', 'vampiric');
+      var hitList = [{ e: t, mult: 1 }];
+      function inHit(e) { return hitList.some(function (h) { return h.e === e; }); }
+      function distAlong(e) {
+        var dx = t.x - hero.x, dy = t.y - hero.y;
+        var l2 = dx * dx + dy * dy || 1;
+        return ((e.x - hero.x) * dx + (e.y - hero.y) * dy) / Math.sqrt(l2);
+      }
       if (ws.pierce) {
         enemies.forEach(function (e) {
           if (e === t) return;
-          if (distToSeg(e.x, e.y, hero.x, hero.y + 18, t.x, t.y) < e.r + 12) hitList.push(e);
+          if (distToSeg(e.x, e.y, hero.x, hero.y + 18, t.x, t.y) < e.r + 12) hitList.push({ e: e, mult: 1 });
         });
-      } else if (ws.splash > 0) {
-        enemies.forEach(function (e) {
-          if (e === t) return;
-          var sd = Math.sqrt((e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y));
-          if (sd < ws.splash + e.r) hitList.push(e);
-        });
+        if (prc > 0) {
+          enemies.filter(function (e) { return !inHit(e); })
+            .sort(function (a, b) { return Math.hypot(a.x - hero.x, a.y - hero.y) - Math.hypot(b.x - hero.x, b.y - hero.y); })
+            .slice(0, prc).forEach(function (e) { hitList.push({ e: e, mult: 1 }); });
+        }
+      } else {
+        if (prc > 0) {
+          enemies.filter(function (e) { return e !== t && distToSeg(e.x, e.y, hero.x, hero.y + 18, t.x, t.y) < e.r + 12; })
+            .sort(function (a, b) { return distAlong(a) - distAlong(b); })
+            .slice(0, prc).forEach(function (e) { hitList.push({ e: e, mult: 1 }); });
+        }
+        if (ws.splash > 0) {
+          enemies.forEach(function (e) {
+            if (inHit(e)) return;
+            var sd = Math.sqrt((e.x - t.x) * (e.x - t.x) + (e.y - t.y) * (e.y - t.y));
+            if (sd < ws.splash + e.r) hitList.push({ e: e, mult: 0.5 });
+          });
+        }
       }
-      hitList.forEach(function (e) {
-        var dd = e === t ? dmg : Math.round(dmg * (ws.splash > 0 ? 0.5 : 1));
+      // v20a: chain arcs — one new foe per stack, nearest within 90px of the
+      // last chained foe, 50% damage, never re-hitting a foe from this shot.
+      var chainFrom = t;
+      for (var ci = 0; ci < chn; ci++) {
+        var best = null, bd = 1e9;
+        enemies.forEach(function (e) {
+          if (inHit(e)) return;
+          var cdd = Math.sqrt((e.x - chainFrom.x) * (e.x - chainFrom.x) + (e.y - chainFrom.y) * (e.y - chainFrom.y));
+          if (cdd <= 90 && cdd < bd) { bd = cdd; best = e; }
+        });
+        if (!best) break;
+        hitList.push({ e: best, mult: 0.5 });
+        chainFrom = best;
+      }
+      hitList.forEach(function (h) {
+        var e = h.e;
+        var dd = Math.round(dmg * h.mult);
         e.hp -= dd;
+        if (brn > 0) {
+          if (!e.burnUntil || ts > e.burnUntil) floaters.push({ x: e.x, y: e.y - e.r - 20, txt: 'BRN', color: '#ff6b35', life: 1 });
+          e.burnDps = 6 * brn; e.burnUntil = ts + 3000;
+        }
+        if (frs > 0) { e.slowPct = (e.boss ? 0.5 : 1) * 0.12 * frs; e.slowUntil = ts + 2000; }
+        if (vam > 0) S.heroHp = Math.min(maxHpEff(), S.heroHp + Math.min(8, dd * 0.03 * vam));
         var kdx = e.x - hero.x, kdy = e.y - hero.y, kd = Math.sqrt(kdx * kdx + kdy * kdy) || 1;
         var kb = e.boss ? 18 : 70;
         e.kx += kdx / kd * kb; e.ky += kdy / kd * kb;
@@ -2130,9 +2264,16 @@ function update(dt, ts) {
     }
     var dx = tx - e.x, dy = ty - e.y;
     var d = Math.sqrt(dx * dx + dy * dy) || 1;
+    // v20a: burn DoT + frost slow tick (both set by weapon hits)
+    if (e.burnUntil && e.burnDps) {
+      if (ts <= e.burnUntil) e.hp -= e.burnDps * dt;
+      else { e.burnDps = 0; e.burnUntil = 0; }
+    }
+    if (e.slowUntil && ts > e.slowUntil) { e.slowPct = 0; e.slowUntil = 0; }
+    var spd = e.slowPct ? e.speed * (1 - e.slowPct) : e.speed;
     var px0 = e.x, py0 = e.y;
-    e.x += dx / d * e.speed * dt;
-    e.y += dy / d * e.speed * dt;
+    e.x += dx / d * spd * dt;
+    e.y += dy / d * spd * dt;
     e.x += e.kx * dt; e.y += e.ky * dt;
     var kdec = Math.exp(-6 * dt);
     e.kx *= kdec; e.ky *= kdec;
@@ -2146,9 +2287,11 @@ function update(dt, ts) {
     if (e.hitCd > 0) e.hitCd -= dt;
     var hdx = hero.x - e.x, hdy = hero.y - e.y;
     var hd = Math.sqrt(hdx * hdx + hdy * hdy) || 1;
-    if (hd < e.r + hero.r && e.hitCd <= 0 && Date.now() >= spawnProtectUntil) {
-      var dmg = Math.max(1, e.dmg - armorBonus());
+    if (hd < e.r + hero.r && e.hitCd <= 0 && e.hp > 0 && Date.now() >= spawnProtectUntil) {
+      var dmg = Math.max(1, e.dmg - armorBonus() - topAffixStacks('armor', 'bulwark'));
       S.heroHp -= dmg;
+      var thr = topAffixStacks('armor', 'thorns');
+      if (thr > 0 && !e.boss) e.hp -= Math.round(dmg * 0.15 * thr);
       e.hitCd = 0.9;
       armorFlashUntil = Date.now() + 100; // v19b: armor rings flash white for 100ms
       floaters.push({ x: hero.x, y: hero.y - 24, txt: '-' + dmg, color: '#ff2d95', life: 1 });
@@ -2158,7 +2301,7 @@ function update(dt, ts) {
         AN.totals.deaths += 1; if (AN.session) AN.session.deaths += 1;
         var lost = Math.floor(S.crypto * 0.1);
         S.crypto -= lost;
-        S.heroHp = S.maxHp;
+        S.heroHp = maxHpEff();
         S.kills = 0;
         hero.vx = 0; hero.vy = 0; // v18: respawn where you fell — no arena center to snap back to
         enemies.forEach(function (foe) { var ep2 = edgePoint(); foe.x = ep2.x; foe.y = ep2.y; });
@@ -2181,6 +2324,12 @@ function update(dt, ts) {
         b.x += dx2 / d2 * push; b.y += dy2 / d2 * push;
       }
     }
+  }
+  // v20a: foes killed by burn DoT or thorns reflect die here (shot/nova deaths are handled inline)
+  var dotDead = enemies.filter(function (e) { return !e.leaving && e.hp <= 0; });
+  if (dotDead.length) {
+    enemies = enemies.filter(function (e) { return e.leaving || e.hp > 0; });
+    dotDead.forEach(function (e) { onKill(e, 'dot'); });
   }
   // pickups: settle, then magnet + collect
   pickups.forEach(function (p) {
@@ -2211,8 +2360,14 @@ function update(dt, ts) {
       var dd = Math.sqrt((e.x - hero.x) * (e.x - hero.x) + (e.y - hero.y) * (e.y - hero.y));
       if (dd < 220) nearFoe = true;
     });
-    if (!nearFoe) S.heroHp = Math.min(S.maxHp, S.heroHp + Math.max(1, S.maxHp * 0.02));
+    if (!nearFoe) S.heroHp = Math.min(maxHpEff(), S.heroHp + Math.max(1, maxHpEff() * 0.02));
     lastRegen = ts;
+  }
+  // v20a: REGEN ticks every 5s, in or out of combat
+  var rgn = topAffixStacks('armor', 'regen');
+  if (rgn > 0 && ts - lastRgn > 5000) {
+    S.heroHp = Math.min(maxHpEff(), S.heroHp + maxHpEff() * 0.01 * rgn);
+    lastRgn = ts;
   }
   floaters.forEach(function (f) { f.y -= 0.6; f.life -= 0.012; });
   floaters = floaters.filter(function (f) { return f.life > 0; });
