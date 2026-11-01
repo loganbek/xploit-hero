@@ -747,7 +747,7 @@ function termSubmit() {
   inp.value = '';
   if (!v) return;
   termPrint(termPrompt() + ' ' + raw);
-  if (v === 'help') { termPrint('commands: ls, cat <file>, chmod +x <file>, ./<script>, nmap <target>, ssh -p <port> <user>@<target>, clear'); return; }
+  if (v === 'help') { termPrint('commands: ls, cat <file>, whoami, pwd, echo <text>, id, uname, hostname, date, chmod +x <file>, ./<script>, nmap <target>, ssh -p <port> <user>@<target>, clear'); return; }
   if (v === 'clear') { document.getElementById('termOut').textContent = ''; return; }
   var candidates = [v];
   // v18 patch: glob expansion for every command, not just cat/ls --
@@ -781,6 +781,17 @@ function termSubmit() {
       termPrint(nodeCurrent.files[f] !== undefined ? nodeCurrent.files[f] : 'cat: ' + f + ': no such file');
     }
   }
+  // v18 patch 2: a real shell answers everyday commands instead of
+  // 'not quite' -- whoami is you, pwd is your home, echo echoes.
+  var handled = false;
+  if (v === 'whoami') { termPrint(handle()); handled = true; }
+  else if (v === 'pwd') { termPrint('/home/' + handle().toLowerCase()); handled = true; }
+  else if (v === 'echo') { termPrint(''); handled = true; }
+  else if (v.indexOf('echo ') === 0) { termPrint(raw.trim().replace(/^echo\s+/i, '')); handled = true; }
+  else if (v === 'id') { termPrint('uid=1000(' + handle().toLowerCase() + ') gid=1000(' + handle().toLowerCase() + ') groups=1000(' + handle().toLowerCase() + ')'); handled = true; }
+  else if (v === 'uname' || v === 'uname -a') { termPrint('Linux mainframe 6.8.0-xploit #1 SMP x86_64 GNU/Linux'); handled = true; }
+  else if (v === 'hostname') { termPrint('mainframe'); handled = true; }
+  else if (v === 'date') { termPrint(new Date().toString()); handled = true; }
   var progressed = false;
   nodeCurrent.steps.forEach(function (st, i) {
     if (!nodeDone[i]) {
@@ -817,7 +828,12 @@ function termSubmit() {
     termHint();
     return;
   }
-  if (!progressed) termPrint('FUSE // not quite — check the hint below.');
+  if (!progressed && !handled) {
+    var tok = v.split(' ')[0];
+    var knownCmds = ['ls', 'cat', 'exiftool', 'grep', 'chmod', 'nmap', 'ssh', 'whoami', 'pwd', 'echo', 'id', 'uname', 'hostname', 'date', 'help', 'clear'];
+    if (tok.charAt(0) === '.' || knownCmds.indexOf(tok) >= 0) termPrint('FUSE // not quite — check the hint below.');
+    else termPrint(tok + ': command not found');
+  }
   termHint();
 }
 function closeNode() {
