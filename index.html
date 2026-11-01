@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v21</title>
+<title>XPLOIT HERO — POC v21.1</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v21 // 70-tier ladder — inventory + rank-up ding</div>
+  <div id="sub">POC v21.1 // minimap — minimal, bottom-right, transparent</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -548,7 +548,7 @@ function mobPoolFor(stage) {
   return [ENEMIES[stage % 6], ENEMIES[(stage + 2) % 6], ENEMIES[(stage + 4) % 6]];
 }
 var SAVE_KEY = 'xploit-hero-poc-v2';
-var GAME_VERSION = 'v21'; // v21e: final 70-tier slice — title becomes POC v21 per spec §9 (not v21e); save key never changes with it.
+var GAME_VERSION = 'v21.1'; // v21.1: minimap polish only — minimal, bottom-right, transparent; save key never changes with it.
 var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR'], [25, 'GHOST IN THE MACHINE'], [30, 'ZERO-DAY LEGEND'], [40, 'MAINFRAME MYTH'], [50, 'SINGULARITY']]; // v21d: paragon ranks (v20 §5.1)
 var KILLS_PER_STAGE = 5;
 var AC = null;
@@ -2640,9 +2640,22 @@ drawMob(e, c);
   }
 }
 // ---------- v21d: minimap (endless world makes the mainframe unfindable) ----------
-// Small top-right overlay, hero at center, radius 350 world px (covers the
-// off-screen spawn ring). No new mechanics, no save change. Data helper
-// minimapData() exists so the harness can assert counts without a canvas.
+// v21.1: MINIMAL, BOTTOM-RIGHT, TRANSPARENT. 64x64 (was 84x84), anchored to the
+// canvas bottom-right corner (DOM buttons sit below the canvas, so no control
+// collision; the hero overhead label is world-anchored, not a fixed corner).
+// Background alpha 0.25 with a faint border so the world shows through; hero,
+// enemy dots, and the mainframe marker/arrow stay fully opaque. Crate/barrel/
+// data-node dots dropped — at 64px they were clutter, not information.
+// Radius logic unchanged: 350 world px, hero at center. No new mechanics,
+// no save change. minimapGeom()/minimapPulse() exist so the harness can assert
+// geometry and pulsing without a canvas.
+function minimapGeom(w, h) {
+  var size = 64;
+  return { size: size, x: w - size - 10, y: h - size - 10, bgAlpha: 0.25, borderAlpha: 0.5 };
+}
+function minimapPulse() {
+  return nodePending ? (3 + Math.sin(Date.now() / 200) * 1.5) : 3;
+}
 function minimapData() {
   var server = null;
   world.forEach(function (o) { if (o.kind === 'server') server = o; });
@@ -2653,39 +2666,34 @@ function minimapData() {
     serverAngle: server ? Math.atan2(dy, dx) : null };
 }
 function drawMinimap(w, h) {
-  var size = 84, R = 350, half = size / 2, mx = w - size - 10, my = 26;
+  var g = minimapGeom(w, h), size = g.size, R = 350, half = size / 2, mx = g.x, my = g.y;
   var scale = half / R;
   function px(wx) { return mx + half + (wx - hero.x) * scale; }
   function py(wy) { return my + half + (wy - hero.y) * scale; }
   ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillStyle = 'rgba(0,0,0,' + g.bgAlpha + ')';
   ctx.fillRect(mx, my, size, size);
-  ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(0,229,255,' + g.borderAlpha + ')'; ctx.lineWidth = 1;
   ctx.strokeRect(mx, my, size, size);
   world.forEach(function (o) {
+    if (o.kind !== 'server') return;
     var x = px(o.x), y = py(o.y);
     var inside = x >= mx && x <= mx + size && y >= my && y <= my + size;
-    if (o.kind === 'server') {
-      if (inside) {
-        var pulse = nodePending ? (3 + Math.sin(Date.now() / 200) * 1.5) : 3;
-        ctx.fillStyle = '#00e5ff';
-        ctx.fillRect(x - pulse, y - pulse, pulse * 2, pulse * 2);
-      } else {
-        // off-screen direction indicator: cyan arrow at the minimap edge.
-        var d = minimapData();
-        var ax = mx + half + Math.cos(d.serverAngle) * (half - 6);
-        var ay = my + half + Math.sin(d.serverAngle) * (half - 6);
-        ctx.fillStyle = '#00e5ff';
-        ctx.beginPath();
-        ctx.moveTo(ax + Math.cos(d.serverAngle) * 6, ay + Math.sin(d.serverAngle) * 6);
-        ctx.lineTo(ax + Math.cos(d.serverAngle + 2.5) * 5, ay + Math.sin(d.serverAngle + 2.5) * 5);
-        ctx.lineTo(ax + Math.cos(d.serverAngle - 2.5) * 5, ay + Math.sin(d.serverAngle - 2.5) * 5);
-        ctx.closePath(); ctx.fill();
-      }
-    } else if (inside) {
-      if (o.kind === 'crate') { ctx.fillStyle = 'rgba(139,90,43,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
-      else if (o.kind === 'barrel') { ctx.fillStyle = 'rgba(194,65,12,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
-      else if (o.kind === 'node') { ctx.fillStyle = 'rgba(0,229,255,0.8)'; ctx.fillRect(x - 1, y - 1, 2, 2); }
+    if (inside) {
+      var pulse = minimapPulse();
+      ctx.fillStyle = '#00e5ff';
+      ctx.fillRect(x - pulse, y - pulse, pulse * 2, pulse * 2);
+    } else {
+      // off-screen direction indicator: cyan arrow at the minimap edge.
+      var d = minimapData();
+      var ax = mx + half + Math.cos(d.serverAngle) * (half - 6);
+      var ay = my + half + Math.sin(d.serverAngle) * (half - 6);
+      ctx.fillStyle = '#00e5ff';
+      ctx.beginPath();
+      ctx.moveTo(ax + Math.cos(d.serverAngle) * 6, ay + Math.sin(d.serverAngle) * 6);
+      ctx.lineTo(ax + Math.cos(d.serverAngle + 2.5) * 5, ay + Math.sin(d.serverAngle + 2.5) * 5);
+      ctx.lineTo(ax + Math.cos(d.serverAngle - 2.5) * 5, ay + Math.sin(d.serverAngle - 2.5) * 5);
+      ctx.closePath(); ctx.fill();
     }
   });
   enemies.forEach(function (e) {
