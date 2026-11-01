@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v20</title>
+<title>XPLOIT HERO — POC v21</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -131,6 +131,14 @@
 // v2 backlog (not in this build): offline earnings, prestige.
 var TIER_NAMES = ['SCRIPT', 'EXPLOIT', 'ZERO-DAY', 'BLACK-ICE', 'SINGULARITY'];
 var TIER_COLORS = ['#00ff88', '#00e5ff', '#ff2d95', '#a78bfa', '#fbbf24'];
+// v21a: the ladder runs to tier 70. T1-5 keep their names/colors exactly;
+// higher tiers read as T<n> in their band's color (band = 10-tier span).
+var TIER_BANDS = ['BASEMENT ERA', 'BLACK-HAT LEAGUE', 'ZERO-DAY MAJORS', 'MAINFRAME MYTHICS', 'GHOST PROTOCOL', 'DEEP SINGULARITY', 'THE LAUGHING ABYSS'];
+var BAND_COLORS = ['#00ff88', '#00e5ff', '#ff2d95', '#a78bfa', '#fbbf24', '#7dd3fc', '#facc15'];
+function tierBand(tier) { return Math.min(6, Math.floor((tier - 1) / 10)); }
+function tierName(tier) { return tier <= 5 ? TIER_NAMES[tier - 1] : 'T' + tier; }
+function tierColor(tier) { return tier <= 0 ? '#00ff88' : (tier <= 5 ? TIER_COLORS[tier - 1] : BAND_COLORS[tierBand(tier)]); }
+function bandEpithet(tier) { return TIER_BANDS[tierBand(tier)]; }
 var WEAPON_CORES = ['INJECTOR', 'WORM', 'BACKDOOR', 'SNIFFER', 'BRUTEFORCER', 'SPOOFER', 'KEYLOGGER', 'ROOTKIT'];
 var ARMOR_CORES = ['SHELL', 'FIREWALL', 'VPN', 'SANDBOX', 'PROXY', 'BASTION', 'HONEYPOT', 'AIRGAP'];
 var NAME_PREFIX = ['GHOST', 'RUST', 'NEON', 'SILENT', 'QUANTUM', 'VELVET', 'IRON', 'ZERO', 'PHANTOM', 'STATIC', 'CRYPT', 'ROGUE'];
@@ -350,7 +358,7 @@ function blankState() {
     theme: 'neon-city', themeUnlocked: false,
     items: [], nextItemId: 1, autoMerge: true,
     injectReadyAt: 0, healReadyAt: 0,
-    arcStep: 0, nodeIdx: 0, ghostDone: false
+    arcStep: 0, nodeIdx: 0, ghostDone: false, ladderAnnounced: false
   };
 }
 function rankFor(level) {
@@ -399,11 +407,19 @@ function distToSeg(px, py, x1, y1, x2, y2) {
 function weaponStats() {
   var t = topWeaponTier();
   if (t === 0) return { int: 700, range: 120, style: 'MELEE', splash: 0, pierce: false };
-  if (t === 1) return { int: 500, range: 140, style: 'FAST', splash: 0, pierce: false };
-  if (t === 2) return { int: 700, range: 175, style: 'RIFLE', splash: 0, pierce: false };
-  if (t === 3) return { int: 1000, range: 175, style: 'SPLASH', splash: 40, pierce: false };
-  if (t === 4) return { int: 900, range: 220, style: 'PIERCE', splash: 0, pierce: true };
-  return { int: 1100, range: 200, style: 'HEAVY', splash: 65, pierce: false };
+  // v21a: the five styles repeat, one Mk per 5-tier cycle — interval tightens
+  // 5%/cycle (300 ms floor), range +15/cycle (cap 320), splash +15/cycle (cap 150).
+  var STYLES = [
+    { style: 'FAST', int: 500, range: 140, splash: 0, pierce: false },
+    { style: 'RIFLE', int: 700, range: 175, splash: 0, pierce: false },
+    { style: 'SPLASH', int: 1000, range: 175, splash: 40, pierce: false },
+    { style: 'PIERCE', int: 900, range: 220, splash: 0, pierce: true },
+    { style: 'HEAVY', int: 1100, range: 200, splash: 65, pierce: false }
+  ];
+  var base = STYLES[(t - 1) % 5];
+  var cycle = Math.floor((t - 1) / 5);
+  var name = cycle === 0 ? base.style : base.style + ' Mk' + cycle;
+  return { int: Math.max(300, Math.round(base.int * Math.pow(0.95, cycle))), range: Math.min(320, base.range + 15 * cycle), style: name, splash: Math.min(150, base.splash + 15 * cycle), pierce: base.pierce };
 }
 function spawnWorld() {
   world = [];
@@ -571,15 +587,19 @@ function topItem(type) {
   S.items.forEach(function (it) { if (it.type === type && (!best || it.tier > best.tier || (it.tier === best.tier && (it.bonus || 0) > (best.bonus || 0)))) best = it; });
   return best;
 }
-function weaponBonus() { var w = topItem('weapon'); return w ? w.tier * 3 + (w.bonus || 0) : 0; }
-function armorBonus() { var a = topItem('armor'); return a ? a.tier * 2 + (a.bonus || 0) : 0; }
+function weaponBonus() { var w = topItem('weapon'); if (!w) return 0; return w.tier <= 5 ? w.tier * 3 + (w.bonus || 0) : Math.round(15 * Math.pow(1.18, w.tier - 5)) + (w.bonus || 0); }
+function armorBonus() { var a = topItem('armor'); if (!a) return 0; return a.tier <= 5 ? a.tier * 2 + (a.bonus || 0) : Math.round(10 * Math.pow(1.18, a.tier - 5)) + (a.bonus || 0); }
 function topWeaponTier() { var w = topItem('weapon'); return w ? w.tier : 0; }
 function topArmorTier() { var a = topItem('armor'); return a ? a.tier : 0; }
 function atk() { return S.baseAtk + weaponBonus(); }
 function dataNext() { return Math.floor(30 * Math.pow(S.level + 1, 1.5)); }
 function isBossStage() { return S.stage % 10 === 0; }
 function enemyHpFor(stage, boss) {
-  var hp = Math.round(16 * Math.pow(1.3, stage - 1));
+  // v21a (Logan-approved): 1.30 growth through stage 30, then 1.15 off the
+  // stage-30 value — boss x12 unchanged.
+  var hp;
+  if (stage <= 30) hp = Math.round(16 * Math.pow(1.3, stage - 1));
+  else hp = Math.round(Math.round(16 * Math.pow(1.3, 29)) * Math.pow(1.15, stage - 30));
   return boss ? hp * 12 : hp;
 }
 function enemyDmgFor(stage, boss) {
@@ -647,16 +667,32 @@ function addItem(type, tier) {
   AN.totals.bestTier = Math.max(AN.totals.bestTier, tier);
   return true;
 }
-function dropRoll(firstBlood, x, y) {
+// v21a: drop-tier ladder. Stages 1-20 are byte-identical to v18/v20a
+// (base T1; stage 8+: 25% T2; stage 15+: 12% T3). Stage 21+: base tier =
+// min(70, stage-11), spread 50/20/20/5/5 around it; boss drops base+3.
+function dropTierFor(stage, isBoss) {
+  if (stage >= 21) {
+    var base = Math.min(70, stage - 11);
+    if (isBoss) return Math.min(70, base + 3);
+    var r = Math.random();
+    if (r < 0.50) return base;
+    if (r < 0.70) return Math.max(1, base - 1);
+    if (r < 0.90) return Math.min(70, base + 1);
+    if (r < 0.95) return Math.max(1, base - 2);
+    return Math.min(70, base + 2);
+  }
+  if (stage >= 15 && Math.random() < 0.12) return 3;
+  if (stage >= 8 && Math.random() < 0.25) return 2;
+  return 1;
+}
+function dropRoll(firstBlood, x, y, isBoss) {
   var chance = firstBlood ? 1 : Math.min(1, 0.6 + 0.10 * greedStacks());
   if (Math.random() < chance) {
     var type = Math.random() < 0.5 ? 'weapon' : 'armor';
-    var tier = 1;
-    if (S.stage >= 15 && Math.random() < 0.12) tier = 3;
-    else if (S.stage >= 8 && Math.random() < 0.25) tier = 2;
+    var tier = dropTierFor(S.stage, !!isBoss);
     pickups.push({ x: x, y: y, type: type, tier: tier, life: 25, bob: Math.random() * 6, age: 0, settle: 0.4 });
-    bursts.push({ x: x, y: y, life: 0.5, max: 0.5, color: TIER_COLORS[tier - 1] });
-    log('loot dropped // ' + TIER_NAMES[tier - 1] + ' ' + type.toUpperCase() + ' — walk over it to grab it');
+    bursts.push({ x: x, y: y, life: 0.5, max: 0.5, color: tierColor(tier) });
+    log('loot dropped // ' + tierName(tier) + ' ' + type.toUpperCase() + ' — walk over it to grab it');
   }
 }
 function onKill(e, via) {
@@ -669,7 +705,7 @@ function onKill(e, via) {
   var dataGain = Math.round((8 + S.stage * 2) * (1 + 0.15 * greedStacks()));
   S.crypto += cryptoGain;
   gainData(dataGain);
-  dropRoll(S.kills === 0, e.x, e.y);
+  dropRoll(S.kills === 0, e.x, e.y, e.boss);
   S.kills += 1;
   if (e.boss || (waveSpawned >= waveTotal && enemies.length === 0)) {
     var bonusC = 10 + S.stage * 2;
@@ -750,7 +786,7 @@ function moveDir() {
 // ---------- controls ----------
 function tryMerge(a, b) {
   if (!a || !b || a.id === b.id) return false;
-  if (a.type !== b.type || a.tier !== b.tier || a.tier >= 5) return false;
+  if (a.type !== b.type || a.tier !== b.tier || a.tier >= 70) return false;
   S.items = S.items.filter(function (it) { return it.id !== a.id && it.id !== b.id; });
   var newTier = a.tier + 1;
   var m = mergeAffixes(a, b, newTier);
@@ -759,10 +795,10 @@ function tryMerge(a, b) {
   var parent = (b.bonus || 0) > (a.bonus || 0) ? b : a;
   var rarity = [0, 1, 2, 4].indexOf(bonus);
   if (rarity < 0) rarity = 0;
-  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || TIER_NAMES[newTier - 1], bonus: bonus, rarity: rarity, affixes: m.affixes });
+  S.items.push({ id: S.nextItemId++, type: a.type, tier: newTier, name: parent.name || a.name || b.name || tierName(newTier), bonus: bonus, rarity: rarity, affixes: m.affixes });
   AN.totals.bestTier = Math.max(AN.totals.bestTier, newTier);
   m.dropped.forEach(function () { gainData(5); });
-  log('MERGED // ' + TIER_NAMES[a.tier] + ' ' + parent.name + stars(rarity) + ' forged' +
+  log('MERGED // ' + tierName(newTier) + ' ' + parent.name + stars(rarity) + ' forged' +
     (m.dropped.length ? (' // slot overflow: ' + m.dropped.map(function (d) { return AFFIX_DEFS[d.id].abbr + '×' + d.stacks; }).join(' ') + ' refunded +5 Data each') : ''));
   renderBench();
   return true;
@@ -774,7 +810,7 @@ function autoMergeAll() {
     outer: for (var i = 0; i < S.items.length; i++) {
       for (var j = i + 1; j < S.items.length; j++) {
         var a = S.items[i], b = S.items[j];
-        if (a.type === b.type && a.tier === b.tier && a.tier < 5) { tryMerge(a, b); n += 1; again = true; break outer; }
+        if (a.type === b.type && a.tier === b.tier && a.tier < 70) { tryMerge(a, b); n += 1; again = true; break outer; }
       }
     }
   }
@@ -789,7 +825,7 @@ function renderBench() {
     var icon = it.type === 'weapon' ? '⚔' : '🛡';
     var aff = affixText(it);
     d.innerHTML = '<span>' + icon + '</span><span class="t' + it.tier + '">' +
-      (it.name || TIER_NAMES[it.tier - 1]) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>' +
+      (it.name || tierName(it.tier)) + stars(it.rarity || 0) + '</span><span class="dim">' + it.type + ' T' + it.tier + '</span>' +
       (aff ? '<span class="dim">' + aff + '</span>' : '');
     bench.appendChild(d);
   });
@@ -804,10 +840,9 @@ function renderBench() {
   S.items.forEach(function (it) { var k = it.type + it.tier; counts[k] = (counts[k] || 0) + 1; });
   var parts = [];
   ['weapon', 'armor'].forEach(function (type) {
-    for (var t = 1; t <= 5; t++) {
-      var c = counts[type + t] || 0;
-      if (c > 0) parts.push(c + '× ' + TIER_NAMES[t - 1] + ' ' + type);
-    }
+    Object.keys(counts).filter(function (k) { return k.indexOf(type) === 0; }).map(function (k) { return parseInt(k.slice(type.length), 10); }).sort(function (a, b) { return a - b; }).forEach(function (t) {
+      parts.push(counts[type + t] + '× ' + tierName(t) + ' ' + type);
+    });
   });
   document.getElementById('gearSummary').textContent = parts.length ? ('GEAR: ' + parts.join(' • ')) : 'GEAR: none yet — breach foes for drops, or crack a data node';
 }
@@ -1636,7 +1671,7 @@ function draw() {
   tracers.forEach(function (t) {
     var tt = (t.tier === undefined ? wt : t.tier);
     var fade = Math.max(0, t.life / (t.max || 1));
-    var col = tt === 0 ? '#00ff88' : TIER_COLORS[tt - 1];
+    var col = tt === 0 ? '#00ff88' : tierColor(tt);
     var dx = t.x2 - t.x1, dy = t.y2 - t.y1;
     var dl = Math.sqrt(dx * dx + dy * dy) || 1;
     var ux = dx / dl, uy = dy / dl, px = -uy, py = ux;
@@ -1719,7 +1754,7 @@ drawMob(e, c);
   // pickups on the ground — glowing, bobbing, blink before despawn, pop-in scale
   pickups.forEach(function (p) {
     if (p.life < 5 && Math.sin(p.bob * 4) > 0) return;
-    var pc = TIER_COLORS[p.tier - 1];
+    var pc = tierColor(p.tier);
     var sc = Math.min(1, (p.age || 0) / 0.25);
     var pulse = 1 + 0.15 * Math.sin(p.bob);
     ctx.strokeStyle = pc; ctx.globalAlpha = 0.8;
@@ -1805,7 +1840,7 @@ drawMob(e, c);
     ctx.setLineDash([]); ctx.lineDashOffset = 0;
   }
   // MUSE: headphones on, two fingers chugging away at the netbook
-  var wc = wt === 0 ? '#00ff88' : TIER_COLORS[wt - 1];
+  var wc = wt === 0 ? '#00ff88' : tierColor(wt);
   var hx = hero.x, hy = hero.y;
   var bob = Math.sin(Date.now() / 90);
   ctx.fillStyle = '#00e5ff';
@@ -1883,7 +1918,7 @@ drawMob(e, c);
   ctx.restore();
   // weapon name label under the rig
   var wTop = topItem('weapon');
-  ctx.fillStyle = wt === 0 ? '#00ff88' : TIER_COLORS[wt - 1];
+  ctx.fillStyle = wt === 0 ? '#00ff88' : tierColor(wt);
   ctx.font = '9px monospace';
   ctx.textAlign = 'center';
   var wsD = weaponStats();
@@ -1984,9 +2019,9 @@ function renderStats() {
   var lw = topWeaponTier(), la = topArmorTier();
   var wTop2 = topItem('weapon'), aTop2 = topItem('armor');
   document.getElementById('loadoutW').textContent = (wTop2 ? (wTop2.name + stars(wTop2.rarity || 0)) : 'FISTS') + ' · ' + atk() + ' DMG · ' + weaponStats().style + ((wTop2 && affixText(wTop2)) ? ' · ' + affixText(wTop2) : '');
-  document.getElementById('loadoutW').style.color = lw === 0 ? '#00ff88' : TIER_COLORS[lw - 1];
+  document.getElementById('loadoutW').style.color = lw === 0 ? '#00ff88' : tierColor(lw);
   document.getElementById('loadoutA').textContent = (aTop2 ? (aTop2.name + stars(aTop2.rarity || 0)) : 'NO SHELL') + ((aTop2 && affixText(aTop2)) ? ' · ' + affixText(aTop2) : '');
-  document.getElementById('loadoutA').style.color = la === 0 ? '#00ff88' : TIER_COLORS[la - 1];
+  document.getElementById('loadoutA').style.color = la === 0 ? '#00ff88' : tierColor(la);
   var gearPower = atk() + armorBonus();
   var threat = S.stage * 2 + 4;
   document.getElementById('threat').textContent = threat;
@@ -2011,7 +2046,7 @@ function renderStats() {
   if (sb && sb.style.display !== 'none') {
     var avg = AN.totals.sessions > 0 ? Math.round(AN.totals.playSecs / AN.totals.sessions / 60) : 0;
     var f = AN.funnel;
-    sb.textContent = 'PLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? TIER_NAMES[AN.totals.bestTier - 1] : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
+    sb.textContent = 'PLAYERS: 1 (you — user 0)\nSESSIONS: ' + AN.totals.sessions + ' · TOTAL PLAYTIME: ' + fmtTime(AN.totals.playSecs) + ' · AVG SESSION: ' + avg + 'm\nDAYS PLAYED: ' + Object.keys(AN.days).length + ' · STREAK: ' + streakDays() + ' day' + (streakDays() === 1 ? '' : 's') + '\nSTAGES CLEARED: ' + AN.totals.stagesCleared + ' · BEST STAGE: ' + AN.totals.bestStage + ' · BEST LEVEL: ' + AN.totals.bestLevel + '\nKILLS: ' + AN.totals.kills + ' · DEATHS: ' + AN.totals.deaths + ' · NODES BREACHED: ' + AN.totals.nodesBreached + '\nBEST GEAR TIER: ' + (AN.totals.bestTier > 0 ? tierName(AN.totals.bestTier) : 'none yet') + '\nFUNNEL: start ✔ · S5 ' + (f.stage5 ? '✔' : '—') + ' · boss ' + (f.firstBoss ? '✔' : '—') + ' · S15 ' + (f.stage15 ? '✔' : '—') + ' · S25 ' + (f.stage25 ? '✔' : '—') + '\nFIRST SEEN: ' + AN.firstSeen + ' · local only — nothing leaves this device';
   }
 }
 function nearestInRange(range) {
@@ -2040,6 +2075,12 @@ function update(dt, ts) {
       if (S.stage >= 15) AN.funnel.stage15 = true;
       if (S.stage >= 25) AN.funnel.stage25 = true;
       if (isBossStage()) spawnEnemy(true);
+      // v21a: the ladder opens on first reaching stage 21 (once per save)
+      if (S.stage === 21 && !S.ladderAnnounced) {
+        S.ladderAnnounced = true;
+        banner = { txt: 'THE LADDER OPENS — drops now scale with stage. Seventy tiers. You asked for this.', life: 3 };
+        log('THE LADDER OPENS // drops now scale with stage — seventy tiers');
+      }
     }
   }
   // hero movement: snappy accel, even snappier stop — smooth but sharp
@@ -2109,12 +2150,10 @@ function update(dt, ts) {
     if (o.kind === 'node' && dd < hero.r + o.r) {
       o.gone = true;
       var type = Math.random() < 0.5 ? 'weapon' : 'armor';
-      var tier = 1;
-      if (S.stage >= 15 && Math.random() < 0.12) tier = 3;
-      else if (S.stage >= 8 && Math.random() < 0.25) tier = 2;
+      var tier = dropTierFor(S.stage, false);
       pickups.push({ x: o.x, y: o.y, type: type, tier: tier, life: 25, bob: Math.random() * 6, age: 0, settle: 0.4 });
       bursts.push({ x: o.x, y: o.y, life: 0.5, max: 0.5, color: '#00e5ff' });
-      log('DATA NODE CRACKED // ' + TIER_NAMES[tier - 1] + ' ' + type.toUpperCase() + ' dropped — walk over it');
+      log('DATA NODE CRACKED // ' + tierName(tier) + ' ' + type.toUpperCase() + ' dropped — walk over it');
     }
     if (o.kind === 'server' && dd < hero.r + o.r && nodePending && !briefingOpen && !termOpen) {
       openBriefing(S.stage);
@@ -2205,17 +2244,17 @@ function update(dt, ts) {
         var kb = e.boss ? 18 : 70;
         e.kx += kdx / kd * kb; e.ky += kdy / kd * kb;
         // v19b: the killing blow's floater wears the killer's tier color
-        var kc = topWeaponTier() === 0 ? '#00ff88' : TIER_COLORS[topWeaponTier() - 1];
+        var kc = topWeaponTier() === 0 ? '#00ff88' : tierColor(topWeaponTier());
         floaters.push({ x: e.x, y: e.y - e.r - 8, txt: '-' + dd, color: (e.hp <= 0) ? kc : '#00ff88', life: 1 });
       });
       // v19b: tiered shot — tracer carries its tier + life; t4 adds a beam afterglow
       var ft = topWeaponTier();
-      tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: TRACER_LIFE[ft], max: TRACER_LIFE[ft], tier: ft, kind: 'shot' });
+      tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: TRACER_LIFE[Math.min(ft, 5)], max: TRACER_LIFE[Math.min(ft, 5)], tier: ft, kind: 'shot' });
       if (ft === 4) tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: 0.20, max: 0.20, tier: 4, kind: 'beam' });
       playShotSound(ft);
       if (ft === 3) triggerShake(2, 120);
       if (ft === 5) { triggerShake(4, 180); triggerFlash(0.22, 150); }
-      if (ws.splash > 0) bursts.push({ x: t.x, y: t.y, life: 0.4, max: 0.4, color: topWeaponTier() === 0 ? '#00ff88' : TIER_COLORS[topWeaponTier() - 1], R: ws.splash });
+      if (ws.splash > 0) bursts.push({ x: t.x, y: t.y, life: 0.4, max: 0.4, color: topWeaponTier() === 0 ? '#00ff88' : tierColor(topWeaponTier()), R: ws.splash });
       lastFire = ts;
       var dead = enemies.filter(function (e) { return e.hp <= 0; });
       enemies = enemies.filter(function (e) { return e.hp > 0; });
@@ -2223,7 +2262,7 @@ function update(dt, ts) {
         // v19b: kill burst ring per tier (splash weapons already burst at impact)
         var kt = topWeaponTier();
         if (!(ws.splash > 0)) {
-          bursts.push({ x: e.x, y: e.y, life: 0.5, max: 0.5, color: kt === 0 ? '#00ff88' : TIER_COLORS[kt - 1], R: KILL_BURST_R[kt], sparks: (kt === 0 || kt === 2) ? 3 : 0, mark: kt === 4, ang: Math.atan2(e.y - (hero.y + 18), e.x - hero.x) });
+          bursts.push({ x: e.x, y: e.y, life: 0.5, max: 0.5, color: kt === 0 ? '#00ff88' : tierColor(kt), R: KILL_BURST_R[Math.min(kt, 5)], sparks: (kt === 0 || kt === 2) ? 3 : 0, mark: kt === 4, ang: Math.atan2(e.y - (hero.y + 18), e.x - hero.x) });
         }
         onKill(e);
       });
