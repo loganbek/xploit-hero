@@ -36,18 +36,24 @@ account, no server. Your progress saves in the browser's local storage.
 
 ## Roadmap
 
-- Shipped (v18): the endless world — no more arena walls. The camera
-  follows your rig, the grid and floor scroll as you roam, sectors scatter
-  around wherever you are, foes walk in from just off-screen, and rig-down
-  respawns you where you fell.
-- Next: more Ghost Trail polish, then the Perimeter recon arc — the corp
-  from Ghost Trail becomes your next client.
-- Later: Phish Tank (SOC desk defense), Hackazon (web-app bounty),
-  Chain Reaction (DeFi audit), and a history campaign from the early
-  internet to today.
+- Live now (v20a): a 10-affix loot system — affixes merge and stack,
+  overflow refunds Data, best star kept. Plus v19's four world themes
+  (Neon City, Deep Terminal, Synthwave Vector, Glitch Void) with a toggle.
+- In progress: v21 — the gear ladder grows to ~70 tiers ("laughably
+  large"), with stage-scaled drops so high stages drop high tiers
+  directly. Spec first, then build slices.
+- Backend v2: logins (Google + GitHub first, then Facebook), server save
+  sync, multiplayer (crews, chat, crew boss, leaderboard). Still free,
+  still playable offline.
+- Queued after that: an equipped-gear inventory with pictures, and a
+  rank-up ding celebration.
+- Story arcs (flexible order): Perimeter (recon), Phish Tank (SOC desk
+  defense), Hackazon (web-app bounty), Chain Reaction (DeFi audit),
+  then a history campaign from the early internet to today.
 
 ## Notes
 
-- Fun first: this is a game, not an income scheme. No crypto, no payouts,
-  no accounts.
+- Fun first: this is a game, not an income scheme. No crypto, no payouts.
+  Accounts (optional login + server saves) are coming with the backend —
+  play stays free and works offline.
 - Analytics are local-only (your own browser). No data leaves your device.
