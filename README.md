@@ -7,7 +7,7 @@ commands.
 
 ## ▶️ Play now — one tap
 
-[Play XPLOIT HERO](https://cdn.jsdelivr.net/gh/loganbek/xploit-hero@main/index.html)
+[Play XPLOIT HERO](https://loganbek.github.io/xploit-hero/)
 
 Opens the latest build right in your browser — no install, no account.
 Your save carries over.
