@@ -198,7 +198,7 @@ function blip() { tone(660, 0, 0.08, 'square', 0.08); }
 function blankState() {
   return {
     stage: 1, kills: 0, level: 0, data: 0, crypto: 0,
-    heroHp: 60, maxHp: 60, baseAtk: 6, handle: 'NOOB',
+    heroHp: 60, maxHp: 60, baseAtk: 6, handle: 'n00b',
     items: [], nextItemId: 1, autoMerge: true,
     injectReadyAt: 0, healReadyAt: 0,
     arcStep: 0, nodeIdx: 0, ghostDone: false
@@ -210,13 +210,13 @@ function rankFor(level) {
   return r;
 }
 var S = load() || blankState();
-document.getElementById('handleInput').value = S.handle || 'NOOB';
-document.getElementById('handleInput2').value = S.handle || 'NOOB';
+document.getElementById('handleInput').value = S.handle || 'n00b';
+document.getElementById('handleInput2').value = S.handle || 'n00b';
 if (S.ghostDone) document.getElementById('introNodes').innerHTML = '<b>GHOST TRAIL // SOLVED:</b> Vex is safe. Stages ending in 5 hide a sector mainframe — clear the daemons, walk to it, get FUSE\'s briefing, then jack in when you\'re ready.';
-function handle() { return (S.handle || 'NOOB'); }
+function handle() { return (S.handle || 'n00b'); }
 function termPrompt() { return handle().toLowerCase() + '@mainframe:~$'; }
 function setHandle(v, silent) {
-  var clean = (v || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 12) || 'NOOB';
+  var clean = (v || '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 12) || 'n00b';
   S.handle = clean;
   save();
   document.getElementById('handleInput').value = clean;
@@ -307,6 +307,7 @@ function load() {
     if (!p || typeof p.stage !== 'number' || !Array.isArray(p.items)) return null;
     var s = blankState();
     for (var k in s) { if (p[k] !== undefined) s[k] = p[k]; }
+    if (s.handle === 'NOOB') s.handle = 'n00b'; // v18 patch: old default becomes n00b
     s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } });
     return s;
   } catch (e) { return null; }
@@ -749,6 +750,20 @@ function termSubmit() {
   if (v === 'help') { termPrint('commands: ls, cat <file>, chmod +x <file>, ./<script>, nmap <target>, ssh -p <port> <user>@<target>, clear'); return; }
   if (v === 'clear') { document.getElementById('termOut').textContent = ''; return; }
   var candidates = [v];
+  // v18 patch: glob expansion for every command, not just cat/ls --
+  // 'exiftool *' becomes one candidate per matching file, so it can
+  // satisfy a step the same way 'cat *' already does.
+  if (v.indexOf('*') >= 0) {
+    var gt = v.split(' ');
+    var gi = -1;
+    for (var gi2 = 0; gi2 < gt.length; gi2++) { if (gt[gi2].indexOf('*') >= 0) { gi = gi2; break; } }
+    if (gi >= 0) {
+      globFiles(gt[gi]).forEach(function (fn) {
+        var t2 = gt.slice(); t2[gi] = fn;
+        candidates.push(t2.join(' '));
+      });
+    }
+  }
   if (v === 'ls') {
     termPrint(Object.keys(nodeCurrent.files).join('   '));
   } else if (v.indexOf('ls ') === 0) {
@@ -900,7 +915,7 @@ document.getElementById('resetBtn').onclick = function () {
     document.getElementById('briefing').classList.remove('open');
     hero.x = arenaW() / 2; hero.y = arenaH() / 2; hero.vx = 0; hero.vy = 0;
     renderBench();
-    log('save wiped // fresh NOOB online');
+    log('save wiped // fresh n00b online');
   }
 };
 
@@ -1208,7 +1223,7 @@ drawMob(e, c);
   ctx.fillStyle = '#00e5ff';
   ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('MUSE', hx, hy - 34);
+  ctx.fillText(handle(), hx, hy - 34);
   ctx.textAlign = 'left';
   if (museImg && museImg.complete && museImg.naturalWidth > 0) {
     ctx.drawImage(museImg, hx - 13, hy - 29, 26, 26);
@@ -1242,7 +1257,7 @@ drawMob(e, c);
   ctx.beginPath(); ctx.arc(hx - 6, hy + 22 + (bob > 0 ? -2 : 0), 3, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(hx + 6, hy + 22 + (bob > 0 ? 0 : -2), 3, 0, Math.PI * 2); ctx.fill();
   // weapon by top weapon tier, aimed at nearest foe
-  var aim = nearestInRange(9999);
+  var aim = nearestInRange(weaponStats().range); // v18 patch: barrel only tracks what the weapon can hit
   var ang = aim ? Math.atan2(aim.y - (hero.y + 18), aim.x - hero.x) : 0;
   ctx.save();
   ctx.translate(hero.x, hero.y + 18);
