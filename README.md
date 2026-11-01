@@ -11,7 +11,8 @@ Open `index.html` in any modern browser (phone or desktop). No install, no
 account, no server. Your progress saves in the browser's local storage.
 
 - **Move:** drag anywhere (touch) or WASD / arrow keys. Your rig auto-fires
-  at the nearest daemon.
+  at the nearest daemon. No walls: the world scrolls as you roam, and the
+  camera follows your rig.
 - **INJECT NOVA:** burst attack — button, or SPACE on a keyboard. 10s cooldown.
 - **PATCH UP:** heal — button, or H on a keyboard. 12s cooldown.
 - **Loot:** walk over glowing drops. Gear auto-merges (two of a tier make the
@@ -28,10 +29,11 @@ account, no server. Your progress saves in the browser's local storage.
 
 ## Roadmap
 
-- Next (v17, bugfix): a mainframe that always spawns on stages ending in
-  5 (no more getting stuck after clearing the wave), smoother crate
-  physics, and a brighter mainframe that's easier to spot.
-- Then: more Ghost Trail polish, then the Perimeter recon arc — the corp
+- Shipped (v18): the endless world — no more arena walls. The camera
+  follows your rig, the grid and floor scroll as you roam, sectors scatter
+  around wherever you are, foes walk in from just off-screen, and rig-down
+  respawns you where you fell.
+- Next: more Ghost Trail polish, then the Perimeter recon arc — the corp
   from Ghost Trail becomes your next client.
 - Later: Phish Tank (SOC desk defense), Hackazon (web-app bounty),
   Chain Reaction (DeFi audit), and a history campaign from the early
