@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v14</title>
+<title>XPLOIT HERO — POC v15</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: #020805; color: #00ff88; font-family: ui-monospace, Menlo, Consolas, monospace; }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v14 // sharper movement</div>
+  <div id="sub">POC v15 // crate physics fix</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -120,7 +120,7 @@
 </div>
 <script>
 'use strict';
-// ---------- XPLOIT HERO POC v14 ----------
+// ---------- XPLOIT HERO POC v15 ----------
 // Third-person auto-battler with movement, XP-Hero-style:
 // player steers (drag / WASD / arrows), rig auto-fires at nearest foe.
 // Start: level 0 NOOB -> climb to ELITE HAXZOR. Boss every 10 stages.
@@ -1298,20 +1298,31 @@ function update(dt, ts) {
   hero.x = Math.max(16, Math.min(arenaW() - 16, hero.x + hero.vx * dt));
   hero.y = Math.max(16, Math.min(arenaH() - 16, hero.y + hero.vy * dt));
   // world: crates block + push, barrels smash, nodes crack
+  // crate fix: a blocked shove used to leave the hero's velocity pointing
+  // into the crate, so every frame re-penetrated and got shoved back out —
+  // a 60Hz vibration. Now a blocked shove kills velocity on that axis, a
+  // near-tie on a corner resolves along the dominant velocity axis instead
+  // of flipping axes, and the push-back itself is clamped to the arena.
   world.forEach(function (o) {
     if (o.kind === 'crate') {
       if (circleRect(hero.x, hero.y, hero.r, o.x, o.y, o.w, o.h)) {
         var dx = hero.x - o.x, dy = hero.y - o.y;
         var px = (o.w / 2 + hero.r) - Math.abs(dx), py = (o.h / 2 + hero.r) - Math.abs(dy);
         var ox = 0, oy = 0;
-        if (px < py) ox = dx > 0 ? px : -px; else oy = dy > 0 ? py : -py;
+        var useX = (Math.abs(px - py) < 2) ? (Math.abs(hero.vx) >= Math.abs(hero.vy)) : (px < py);
+        if (useX) ox = dx > 0 ? px : -px; else oy = dy > 0 ? py : -py;
         var nx = o.x + ox, ny = o.y + oy;
         var blocked = nx - o.w / 2 < 0 || nx + o.w / 2 > arenaW() || ny - o.h / 2 < 0 || ny + o.h / 2 > arenaH();
         world.forEach(function (o2) {
           if (o2 !== o && o2.kind === 'crate' && Math.abs(nx - o2.x) < (o.w + o2.w) / 2 && Math.abs(ny - o2.y) < (o.h + o2.h) / 2) blocked = true;
         });
         if (!blocked) { o.x = nx; o.y = ny; o.vx = (ox !== 0 ? Math.sign(ox) * 70 : 0); o.vy = (oy !== 0 ? Math.sign(oy) * 70 : 0); }
-        else { hero.x -= ox; hero.y -= oy; }
+        else {
+          hero.x = Math.max(16, Math.min(arenaW() - 16, hero.x - ox));
+          hero.y = Math.max(16, Math.min(arenaH() - 16, hero.y - oy));
+          if (ox !== 0) hero.vx = 0;
+          if (oy !== 0) hero.vy = 0;
+        }
       }
     }
   });
