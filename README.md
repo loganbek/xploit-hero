@@ -5,6 +5,13 @@ a hacker with a netbook, clearing sectors of daemons, merging loot into
 stronger gear, and jacking into sector mainframes to run real terminal
 commands.
 
+## ▶️ Play now — one tap
+
+[Play XPLOIT HERO](https://cdn.jsdelivr.net/gh/loganbek/xploit-hero@main/index.html)
+
+Opens the latest build right in your browser — no install, no account.
+Your save carries over.
+
 ## Play
 
 Open `index.html` in any modern browser (phone or desktop). No install, no
