@@ -3,63 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v18</title>
+<title>XPLOIT HERO — POC v19</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  body { margin: 0; background: #020805; color: #00ff88; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
   #wrap { max-width: 520px; margin: 0 auto; padding: 10px 12px 24px; }
-  h1 { font-size: 22px; letter-spacing: 2px; margin: 4px 0 2px; text-shadow: 0 0 8px #00ff88; }
-  h1 span { color: #00e5ff; }
-  #sub { color: #ff2d95; font-size: 12px; letter-spacing: 1px; margin-bottom: 10px; }
+  h1 { font-size: 22px; letter-spacing: 2px; margin: 4px 0 2px; text-shadow: 0 0 8px var(--glow); }
+  h1 span { color: var(--accent2); }
+  #sub { color: var(--accent); font-size: 12px; letter-spacing: 1px; margin-bottom: 10px; }
   #stagebox { position: relative; }
-  #cv { width: 100%; height: 320px; display: block; background: #04120a; border: 1px solid #00ff88; border-radius: 8px; box-shadow: 0 0 18px rgba(0,255,136,.25); touch-action: none; }
+  #cv { width: 100%; height: 320px; display: block; background: var(--panel-bg); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 0 18px var(--glow); touch-action: none; }
   #intro { position: absolute; inset: 0; background: rgba(2,8,5,.92); border-radius: 8px; padding: 18px; display: flex; flex-direction: column; justify-content: flex-start; overflow-y: auto; }
-  #intro h2 { color: #00e5ff; margin: 0 0 8px; font-size: 18px; }
-  #intro p { font-size: 13px; line-height: 1.7; color: #86efac; margin: 4px 0; }
+  #intro h2 { color: var(--accent2); margin: 0 0 8px; font-size: 18px; }
+  #intro p { font-size: 13px; line-height: 1.7; color: var(--dim); margin: 4px 0; }
   #intro b { color: #eafff3; }
-  #startBtn { margin-top: 12px; border-color: #00e5ff; color: #00e5ff; background: #03222b; font-size: 18px; }
-  #terminal { position: absolute; inset: 0; background: #04120a; border: 3px solid #00ff88; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; font-family: monospace; z-index: 5; visibility: hidden; opacity: 0; transform: scale(.92); transition: transform .22s ease-out, opacity .22s ease-out; }
+  #startBtn { margin-top: 12px; border-color: var(--accent2); color: var(--accent2); background: var(--btn-bg); font-size: 18px; }
+  #terminal { position: absolute; inset: 0; background: var(--panel-bg); border: 3px solid var(--accent); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; font-family: monospace; z-index: 5; visibility: hidden; opacity: 0; transform: scale(.92); transition: transform .22s ease-out, opacity .22s ease-out; }
   #terminal.open { visibility: visible; opacity: 1; transform: scale(1); }
-  #briefing { position: absolute; inset: 0; background: #04120a; border: 3px solid #00e5ff; border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; font-family: monospace; z-index: 5; visibility: hidden; opacity: 0; transform: scale(.92); transition: transform .22s ease-out, opacity .22s ease-out; }
+  #briefing { position: absolute; inset: 0; background: var(--panel-bg); border: 3px solid var(--accent2); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; font-family: monospace; z-index: 5; visibility: hidden; opacity: 0; transform: scale(.92); transition: transform .22s ease-out, opacity .22s ease-out; }
   #briefing.open { visibility: visible; opacity: 1; transform: scale(1); }
-  #briefHead { font-size: 15px; color: #00e5ff; }
+  #briefHead { font-size: 15px; color: var(--accent2); }
   #briefBody { font-size: 14px; line-height: 1.7; color: #eafff3; }
   #briefJob { font-size: 13px; color: #ffd7ea; }
   #briefing .row { justify-content: flex-start; }
-  #termOut { flex: 1; overflow-y: auto; white-space: pre-wrap; font-size: 13px; color: #00ff88; margin: 8px 0; }
+  #termOut { flex: 1; overflow-y: auto; white-space: pre-wrap; font-size: 13px; color: var(--accent); margin: 8px 0; }
   #termObj { font-size: 13px; color: #ffd7ea; }
-  #termHint { font-size: 12px; color: #00e5ff; min-height: 18px; }
-  #termRow { display: flex; gap: 6px; align-items: center; color: #00ff88; }
-  #termInput { flex: 1; background: #020a06; color: #00ff88; border: 1px solid #00ff88; border-radius: 6px; padding: 8px; font-family: monospace; }
-  #objective { border: 1px solid #ff2d95; border-radius: 8px; padding: 9px 10px; margin-top: 10px; font-size: 13px; color: #ffd7ea; background: #220614; }
+  #termHint { font-size: 12px; color: var(--accent2); min-height: 18px; }
+  #termRow { display: flex; gap: 6px; align-items: center; color: var(--accent); }
+  #termInput { flex: 1; background: var(--body-bg); color: var(--ink); border: 1px solid var(--accent); border-radius: 6px; padding: 8px; font-family: monospace; }
+  #objective { border: 1px solid var(--accent); border-radius: 8px; padding: 9px 10px; margin-top: 10px; font-size: 13px; color: #ffd7ea; background: var(--obj-bg); }
   #objective b { color: #fff; }
-  .panel { border: 1px solid #14532d; border-radius: 8px; padding: 10px; margin-top: 10px; background: #03130a; }
+  .panel { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-top: 10px; background: var(--panel-bg); }
   .row { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; line-height: 1.7; }
   .row b { color: #eafff3; }
-  .cyan { color: #00e5ff; } .pink { color: #ff2d95; } .dim { color: #4ade80; }
-  button { font-family: inherit; font-size: 16px; padding: 13px 10px; border-radius: 8px; border: 1px solid #00ff88; background: #052e1a; color: #00ff88; cursor: pointer; min-height: 48px; }
+  .cyan { color: var(--accent2); } .pink { color: var(--accent); } .dim { color: var(--dim); }
+  button { font-family: inherit; font-size: 16px; padding: 13px 10px; border-radius: 8px; border: 1px solid var(--accent); background: var(--btn-bg); color: var(--accent); cursor: pointer; min-height: 48px; }
   button:active { background: #0a4d2b; }
   button:disabled { opacity: .45; }
   #btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-  #btns button:first-child { border-color: #ff2d95; color: #ff2d95; background: #2b0518; }
+  #btns button:first-child { border-color: var(--accent); color: var(--accent); background: var(--obj-bg); }
   #bench { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 8px; }
-  .slot { border: 1px solid #14532d; border-radius: 6px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; background: #020a05; cursor: pointer; padding: 4px 2px; text-align: center; }
-  .slot.sel { border-color: #00e5ff; box-shadow: 0 0 10px rgba(0,229,255,.6); }
+  .slot { border: 1px solid var(--border); border-radius: 6px; min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 11px; background: var(--body-bg); cursor: pointer; padding: 4px 2px; text-align: center; }
+  .slot.sel { border-color: var(--accent2); box-shadow: 0 0 10px rgba(0,229,255,.6); }
   .slot .t1 { color: #00ff88; } .slot .t2 { color: #00e5ff; } .slot .t3 { color: #ff2d95; } .slot .t4 { color: #a78bfa; } .slot .t5 { color: #fbbf24; }
   .slot.tier2 { border-color: #00e5ff; }
   .slot.tier3 { border-color: #ff2d95; animation: pulse 1.2s infinite; }
   .slot.tier4 { border-color: #a78bfa; animation: pulse 1.2s infinite; }
   .slot.tier5 { border-color: #fbbf24; animation: pulse 1.2s infinite; }
   @keyframes pulse { 0%,100% { box-shadow: 0 0 4px rgba(255,45,149,.4); } 50% { box-shadow: 0 0 14px rgba(255,45,149,.9); } }
-  #log { font-size: 12px; line-height: 1.6; min-height: 78px; color: #86efac; white-space: pre-wrap; word-break: break-word; }
-  #foot { font-size: 11px; color: #4ade80; margin-top: 10px; text-align: center; }
+  #log { font-size: 12px; line-height: 1.6; min-height: 78px; color: var(--dim); white-space: pre-wrap; word-break: break-word; }
+  #foot { font-size: 11px; color: var(--dim); margin-top: 10px; text-align: center; }
   #foot button { font-size: 11px; min-height: 0; padding: 6px 10px; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v18 // Endless world — the camera follows you</div>
+  <div id="sub">POC v19 // Endless world — four themes, one stylesheet</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -73,8 +73,9 @@
       <p><b>WORLD:</b> shove crates around, smash barrels, crack data nodes for loot.</p>
       <p><b>WEAPONS:</b> tiers shoot differently now — check the label for damage, speed, and style.</p>
       <p><b>ANALYTICS:</b> your play is tracked locally — open STATS below the bench. Nothing leaves this device.</p>
+      <p><b>STYLE:</b> finish your first job and FUSE hands you <b>style.css</b> — repaint the whole world.</p>
       <p id="introNodes"><b>CASE FILE 01 // GHOST TRAIL:</b> Vex went dark. Stages ending in 5 hide a sector mainframe — clear the daemons, walk to it, get FUSE's briefing, then jack in when you're ready.</p>
-      <p><b>YOUR HANDLE:</b> <input id="handleInput" type="text" maxlength="12" placeholder="pick your hacker name" style="background:#020a06;color:#00ff88;border:1px solid #00ff88;border-radius:6px;padding:6px;font-family:monospace;"></p>
+      <p><b>YOUR HANDLE:</b> <input id="handleInput" type="text" maxlength="12" placeholder="pick your hacker name" style="background:var(--body-bg);color:var(--ink);border:1px solid var(--accent);border-radius:6px;padding:6px;font-family:monospace;"></p>
       <button id="startBtn">TAP TO JACK IN</button>
     </div>
     <div id="terminal">
@@ -115,12 +116,13 @@
     <div id="statsBox" class="dim" style="display:none;font-size:12px;margin-top:8px;white-space:pre-wrap;"></div>
   </div>
   <div class="panel"><div id="log"></div></div>
-  <div class="panel"><div class="row"><span>HACKER HANDLE: <input id="handleInput2" type="text" maxlength="12" style="background:#020a06;color:#00ff88;border:1px solid #00ff88;border-radius:6px;padding:6px;font-family:monospace;width:130px;"></span><button id="handleSetBtn">SET</button></div></div>
+  <div class="panel"><div class="row"><span>HACKER HANDLE: <input id="handleInput2" type="text" maxlength="12" style="background:var(--body-bg);color:var(--ink);border:1px solid var(--accent);border-radius:6px;padding:6px;font-family:monospace;width:130px;"></span><button id="handleSetBtn">SET</button></div><div class="row" id="themeRow" style="display:none;"><span>THEME</span><button id="themeBtn">NEON CITY →</button></div></div>
   <div id="foot">progress auto-saves on this device <button id="resetBtn">wipe save</button></div>
 </div>
 <script>
 'use strict';
-// ---------- XPLOIT HERO POC v18 ----------
+// ---------- XPLOIT HERO POC v19 ----------
+// v19a: theme system + toggle (four aesthetics, CSS-unlock story). No VFX ladder yet (v19b).
 // Third-person auto-battler with movement, XP-Hero-style:
 // player steers (drag / WASD / arrows), rig auto-fires at nearest foe.
 // Start: level 0 NOOB -> climb to ELITE HAXZOR. Boss every 10 stages.
@@ -156,6 +158,78 @@ var BOSS_THEME = { name: 'FIREWALL // RED ALERT', bg: '#1a0505', grid: 'rgba(255
 function themeFor(stage) {
   if (stage % 10 === 0) return BOSS_THEME;
   return THEMES[(stage - 1) % THEMES.length];
+}
+
+// ---------- v19a: four aesthetics, one version, four stylesheets ----------
+// The aesthetic is a SKIN: sector names still cycle via themeFor(), mob
+// colors, gear tier colors, bench colors and the low-HP vignette NEVER
+// change with theme (they carry gameplay information). Boss stages use
+// the theme's boss entry for bg/accent only; ambience layers keep drawing.
+var AESTHETICS = {
+  'neon-city': { label: 'NEON CITY', tag: 'NEON CITY',
+    css: { body: '#070312', ink: '#e8f6ff', dim: '#8fd8ef', accent: '#ff2d95', accent2: '#00e5ff', panel: '#0d0718', border: '#3b1d5e', btnBg: '#1c0a33', objBg: '#220614', glow: 'rgba(255,45,149,.30)' },
+    bg: [{ o: 0, c: '#0b0620' }, { o: 0.55, c: '#1a0b2e' }, { o: 1, c: '#05030f' }],
+    grid: 'rgba(0,229,255,.10)', avenue: 'rgba(0,229,255,.22)',
+    decalGlyphs: ['\u25ad', '\u25ae', '\u2261'], decalColor: null, decalAlpha: [0.10, 0.20],
+    boss: { bg: [{ o: 0, c: '#1a0505' }, { o: 0.55, c: '#2a0810' }, { o: 1, c: '#0a0205' }], accent: '#ff2d95' } },
+  'deep-terminal': { label: 'DEEP TERMINAL', tag: 'DEEP TERMINAL',
+    css: { body: '#020805', ink: '#00ff88', dim: '#4ade80', accent: '#00ff88', accent2: '#00e5ff', panel: '#03130a', border: '#14532d', btnBg: '#052e1a', objBg: '#220614', glow: 'rgba(0,255,136,.25)' },
+    bg: [{ o: 0, c: '#020805' }],
+    grid: 'rgba(0,255,136,.08)', avenue: null,
+    decalGlyphs: ['\u00b7', '\u2591', '+', '\u00d7', '\u25e6'], decalColor: '#00e5ff', decalAlpha: [0.10, 0.20],
+    boss: { bg: [{ o: 0, c: '#1a0505' }], accent: '#ff2d95' } },
+  'synthwave': { label: 'SYNTHWAVE VECTOR', tag: 'SYNTHWAVE',
+    css: { body: '#12041f', ink: '#ffd7ea', dim: '#c084fc', accent: '#ff2d95', accent2: '#00e5ff', panel: '#1c0a2e', border: '#4c1d95', btnBg: '#2b0518', objBg: '#220614', glow: 'rgba(255,45,149,.30)' },
+    bg: [{ o: 0, c: '#160b29' }, { o: 0.45, c: '#3b0f4a' }, { o: 0.67, c: '#ff2d95' }, { o: 0.69, c: '#ff2d95' }, { o: 1, c: '#0d0218' }],
+    grid: 'rgba(255,45,149,.14)', avenue: null,
+    decalGlyphs: null, decalColor: null, decalAlpha: [0.18, 0.18],
+    boss: { bg: [{ o: 0, c: '#1a0505' }, { o: 0.5, c: '#3b0f1a' }, { o: 1, c: '#0d0218' }], accent: '#ff2d95' } },
+  'void': { label: 'GLITCH VOID', tag: 'GLITCH VOID',
+    css: { body: '#030309', ink: '#c7d2fe', dim: '#818cf8', accent: '#818cf8', accent2: '#ff2d95', panel: '#0a0a18', border: '#312e81', btnBg: '#10102a', objBg: '#1a0510', glow: 'rgba(129,140,248,.30)' },
+    bg: [{ o: 0, c: '#030309' }],
+    grid: 'rgba(129,140,248,.06)', avenue: null,
+    decalGlyphs: ['\u00b7', '\u2591', '+', '\u00d7', '\u25e6'], decalColor: '#818cf8', decalAlpha: [0.08, 0.16],
+    boss: { bg: [{ o: 0, c: '#0d0205' }], accent: '#ff2d95' } }
+};
+var THEME_ORDER = ['neon-city', 'deep-terminal', 'synthwave', 'void'];
+function aesthetic() { return AESTHETICS[S.theme] || AESTHETICS['deep-terminal']; }
+function canvasPaint() {
+  var a = aesthetic();
+  var boss = isBossStage();
+  return { id: S.theme, theme: a, boss: boss, bg: boss ? a.boss.bg : a.bg,
+    grid: a.grid, avenue: a.avenue || null,
+    accent: boss ? a.boss.accent : a.css.accent, tag: a.tag };
+}
+function applyThemeCss() {
+  var a = aesthetic();
+  var b = document.body;
+  if (!b || !b.style) return;
+  var vars = { '--body-bg': a.css.body, '--ink': a.css.ink, '--dim': a.css.dim, '--accent': a.css.accent, '--accent2': a.css.accent2, '--panel-bg': a.css.panel, '--border': a.css.border, '--btn-bg': a.css.btnBg, '--obj-bg': a.css.objBg, '--glow': a.css.glow };
+  for (var k in vars) { if (b.style.setProperty) b.style.setProperty(k, vars[k]); else b.style[k] = vars[k]; }
+}
+// setTheme is the ONLY function that changes themes: never touches damage,
+// HP, spawns, loot, or stage state.
+function setTheme(id) {
+  if (!AESTHETICS[id]) return false;
+  S.theme = id;
+  applyThemeCss();
+  var btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = AESTHETICS[id].label + ' \u2192';
+  log('theme // ' + AESTHETICS[id].label + ' online');
+  save();
+  return true;
+}
+function cycleTheme() {
+  if (!S.themeUnlocked) return false;
+  var i = THEME_ORDER.indexOf(S.theme);
+  if (i < 0) i = 0;
+  return setTheme(THEME_ORDER[(i + 1) % THEME_ORDER.length]);
+}
+function refreshThemeBtn() {
+  var row = document.getElementById('themeRow');
+  if (row) row.style.display = S.themeUnlocked ? 'flex' : 'none';
+  var btn = document.getElementById('themeBtn');
+  if (btn) btn.textContent = aesthetic().label + ' \u2192';
 }
 // Mob types: distinct shape + color + stat flavor, so power reads visually.
 // Bigger radius = stronger; shape/color tell you what it does.
@@ -199,6 +273,7 @@ function blankState() {
   return {
     stage: 1, kills: 0, level: 0, data: 0, crypto: 0,
     heroHp: 60, maxHp: 60, baseAtk: 6, handle: 'n00b',
+    theme: 'neon-city', themeUnlocked: false,
     items: [], nextItemId: 1, autoMerge: true,
     injectReadyAt: 0, healReadyAt: 0,
     arcStep: 0, nodeIdx: 0, ghostDone: false
@@ -224,6 +299,7 @@ function setHandle(v, silent) {
   if (!silent) log('handle set // welcome, ' + clean);
 }
 document.getElementById('handleSetBtn').onclick = function () { setHandle(document.getElementById('handleInput2').value); };
+document.getElementById('themeBtn').onclick = function () { cycleTheme(); };
 var started = false;
 var hero = { x: 250, y: 160, r: 14, speed: 175, vx: 0, vy: 0 };
 var museImg = (typeof Image !== 'undefined') ? new Image() : null;
@@ -308,6 +384,9 @@ function load() {
     var s = blankState();
     for (var k in s) { if (p[k] !== undefined) s[k] = p[k]; }
     if (s.handle === 'NOOB') s.handle = 'n00b'; // v18 patch: old default becomes n00b
+    // v19a: saves that predate themes keep today's look (deep-terminal) until unlock
+    if (p.theme === undefined) s.theme = 'deep-terminal';
+    if (!AESTHETICS[s.theme]) s.theme = 'deep-terminal';
     s.items.forEach(function (it) { if (!it.name) { var r0 = rollItem(it.type, it.tier); it.name = r0.name; it.bonus = r0.bonus; it.rarity = r0.rarity; } });
     return s;
   } catch (e) { return null; }
@@ -475,6 +554,12 @@ function onKill(e) {
     pendingStage = S.stage + 1;
     intermissionUntil = Date.now() + 5000;
     if (S.stage % 10 === 5) { intermissionUntil = 0; nodePending = true; if (!world.some(function (o) { return o.kind === 'server'; })) { world.push({ kind: 'server', x: hero.x + 170, y: hero.y, r: 26 }); log('MAINFRAME // signal relocated — walk to it'); } }
+    // v19a fallback: first boss kill unlocks the theme switcher too (node-skippers)
+    if (e.boss && !S.themeUnlocked) {
+      S.themeUnlocked = true;
+      log('FUSE // boss down. Bonus lesson: style.css — the whole world is a stylesheet. Tap THEME to repaint it.');
+      refreshThemeBtn();
+    }
     AN.totals.stagesCleared += 1;
     AN.totals.bestStage = Math.max(AN.totals.bestStage, S.stage);
     if (e.boss) AN.funnel.firstBoss = true;
@@ -490,11 +575,15 @@ function onKill(e) {
 
 // ---------- input: WASD/arrows + drag joystick ----------
 var cvEl = document.getElementById('cv');
-window.addEventListener('keydown', function (e) {
+// v19a: T cycles the theme, but ONLY when no text input is focused and no
+// terminal/briefing overlay is open. T inside an input types a 't', never switches.
+function handleKeyDown(e) {
   if (e.target && e.target.tagName === 'INPUT') return;
   keys[e.key.toLowerCase()] = true;
-  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].indexOf(e.key.toLowerCase()) >= 0) e.preventDefault();
-});
+  if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].indexOf(e.key.toLowerCase()) >= 0 && e.preventDefault) e.preventDefault();
+  if (e.key.toLowerCase() === 't' && !briefingOpen && !termOpen) cycleTheme();
+}
+window.addEventListener('keydown', handleKeyDown);
 window.addEventListener('keyup', function (e) { keys[e.key.toLowerCase()] = false; });
 function canvasPos(e) {
   var r = cvEl.getBoundingClientRect();
@@ -747,7 +836,7 @@ function termSubmit() {
   inp.value = '';
   if (!v) return;
   termPrint(termPrompt() + ' ' + raw);
-  if (v === 'help') { termPrint('commands: ls, cat <file>, whoami, pwd, echo <text>, id, uname, hostname, date, chmod +x <file>, ./<script>, nmap <target>, ssh -p <port> <user>@<target>, clear'); return; }
+  if (v === 'help') { termPrint('commands: ls, cat <file>, theme, whoami, pwd, echo <text>, id, uname, hostname, date, chmod +x <file>, ./<script>, nmap <target>, ssh -p <port> <user>@<target>, clear'); return; }
   if (v === 'clear') { document.getElementById('termOut').textContent = ''; return; }
   var candidates = [v];
   // v18 patch: glob expansion for every command, not just cat/ls --
@@ -792,6 +881,20 @@ function termSubmit() {
   else if (v === 'uname' || v === 'uname -a') { termPrint('Linux mainframe 6.8.0-xploit #1 SMP x86_64 GNU/Linux'); handled = true; }
   else if (v === 'hostname') { termPrint('mainframe'); handled = true; }
   else if (v === 'date') { termPrint(new Date().toString()); handled = true; }
+  // v19a: theme is a free command (handled, never breaks a story step).
+  // Before unlock it only tells you how to earn style.css.
+  else if (v === 'theme' || v.indexOf('theme ') === 0) {
+    handled = true;
+    if (!S.themeUnlocked) { termPrint('FUSE // finish a job first — style.css comes after your first hack.'); }
+    else if (v === 'theme') { termPrint('theme // ' + aesthetic().label + ' (neon, terminal, synthwave, void)'); }
+    else {
+      var tn = v.slice(6).trim();
+      var match = null;
+      THEME_ORDER.forEach(function (id) { if (!match && (id === tn || id.indexOf(tn) >= 0)) match = id; });
+      if (match) { setTheme(match); termPrint('theme // ' + AESTHETICS[match].label + ' online'); }
+      else termPrint("theme: unknown theme '" + tn + "' — try: neon, terminal, synthwave, void");
+    }
+  }
   var progressed = false;
   nodeCurrent.steps.forEach(function (st, i) {
     if (!nodeDone[i]) {
@@ -811,6 +914,12 @@ function termSubmit() {
       gainData(60);
       ding();
       log('STORY NODE // ' + nodeCurrent.title + ' breached — +75 crypto +60 data');
+      // v19a: first node completion unlocks the theme switcher (style.css lesson)
+      if (!S.themeUnlocked) {
+        S.themeUnlocked = true;
+        log('FUSE // you found the box. Bonus lesson: style.css — the whole world is a stylesheet. Tap THEME to repaint it.');
+        refreshThemeBtn();
+      }
       if (nodeCurrent.arc === 'ghost') {
         S.arcStep += 1;
         log('GHOST TRAIL // beat ' + nodeCurrent.beat + ' of 4 cleared');
@@ -830,7 +939,7 @@ function termSubmit() {
   }
   if (!progressed && !handled) {
     var tok = v.split(' ')[0];
-    var knownCmds = ['ls', 'cat', 'exiftool', 'grep', 'chmod', 'nmap', 'ssh', 'whoami', 'pwd', 'echo', 'id', 'uname', 'hostname', 'date', 'help', 'clear'];
+    var knownCmds = ['ls', 'cat', 'exiftool', 'grep', 'chmod', 'nmap', 'ssh', 'whoami', 'pwd', 'echo', 'id', 'uname', 'hostname', 'date', 'help', 'clear', 'theme'];
     if (tok.charAt(0) === '.' || knownCmds.indexOf(tok) >= 0) termPrint('FUSE // not quite — check the hint below.');
     else termPrint(tok + ': command not found');
   }
@@ -931,6 +1040,8 @@ document.getElementById('resetBtn').onclick = function () {
     document.getElementById('briefing').classList.remove('open');
     hero.x = arenaW() / 2; hero.y = arenaH() / 2; hero.vx = 0; hero.vy = 0;
     renderBench();
+    applyThemeCss();
+    refreshThemeBtn();
     log('save wiped // fresh n00b online');
   }
 };
@@ -943,6 +1054,7 @@ function fitCanvas() {
   cvEl.width = Math.round(w * dpr);
   cvEl.height = Math.round(320 * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildVignette();
 }
 window.addEventListener('resize', fitCanvas);
 function drawMob(e, c) {
@@ -1060,47 +1172,281 @@ function hash2(cx, cy) {
   return (h >>> 0) / 4294967296;
 }
 var DECAL_GLYPHS = ['·', '░', '+', '×', '◦'];
+// v19a theme layers. Each painter is a no-op unless its theme is active,
+// so inactive themes cost one string comparison per frame. No painter
+// allocates in the hot path except the preallocated rain drops (60).
+var rainDrops = [];
+for (var ri = 0; ri < 60; ri++) rainDrops.push({ x: Math.random() * 500, y: Math.random() * 320, len: 8 + Math.random() * 8, speed: 500 + Math.random() * 300 });
+// deterministic chunk hash — same chunk always draws the same decals
+function hash2(cx, cy, k) {
+  var h = Math.imul(cx, 374761393) ^ Math.imul(cy, 668265263);
+  if (k) h ^= Math.imul(k, 974711);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+var DECAL_GLYPHS = ['\u00b7', '\u2591', '+', '\u00d7', '\u25e6'];
+function drawSkyline() {
+  var w = arenaW(), h = arenaH();
+  var layers = [
+    { factor: 0.20, color: '#120826', hMin: 60, hMax: 140, wMin: 26, wMax: 44, slot: 42, windows: false },
+    { factor: 0.45, color: '#1d0b38', hMin: 40, hMax: 110, wMin: 22, wMax: 38, slot: 38, windows: false },
+    { factor: 0.70, color: '#2a0f4d', hMin: 30, hMax: 90, wMin: 20, wMax: 34, slot: 44, windows: true }
+  ];
+  for (var li = 0; li < layers.length; li++) {
+    var L = layers[li];
+    var off = (((cam.x * L.factor) % L.slot) + L.slot) % L.slot;
+    ctx.fillStyle = L.color;
+    for (var k = -1; k * L.slot - off < w + L.slot; k++) {
+      var bx = k * L.slot - off;
+      var bw = L.wMin + hash2(li, k) * (L.wMax - L.wMin);
+      var bh = L.hMin + hash2(li * 3 + 1, k) * (L.hMax - L.hMin);
+      ctx.fillRect(bx, h - bh, bw, bh);
+      if (L.windows) {
+        var cols = Math.max(1, Math.floor(bw / 12)), rows = Math.max(1, Math.floor(bh / 16));
+        for (var wx = 0; wx < cols; wx++) {
+          for (var wy = 0; wy < rows; wy++) {
+            if (hash2(k * 7 + wx, wy) < 0.35) {
+              ctx.fillStyle = hash2(k, wx * 3 + wy) < 0.7 ? '#ffb000' : '#00e5ff';
+              ctx.fillRect(bx + 4 + wx * 12, h - bh + 6 + wy * 16, 4, 5);
+            }
+          }
+        }
+        ctx.fillStyle = L.color;
+      }
+    }
+  }
+}
+function drawRain() {
+  var w = arenaW();
+  ctx.strokeStyle = 'rgba(0,229,255,.35)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var i = 0; i < rainDrops.length; i++) {
+    var d = rainDrops[i];
+    var dy = d.speed / 60;
+    d.y += dy; d.x -= dy * 0.2;
+    if (d.y > 320) { d.y = -20; d.x = Math.random() * w; }
+    ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.len * 0.2, d.y + d.len);
+  }
+  ctx.stroke();
+}
+function drawSun(boss) {
+  var w = arenaW();
+  var cx = w - 70, cy = 70, r = 46;
+  ctx.fillStyle = boss ? '#ff2d95' : '#ffb000';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,45,149,.85)';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = '#160b29';
+  var bars = [[8, 2], [16, 3], [24, 4], [32, 5]];
+  bars.forEach(function (b) {
+    var dy = b[0], hh = Math.sqrt(Math.max(0, r * r - dy * dy));
+    ctx.fillRect(cx - hh, cy + dy, hh * 2, b[1]);
+  });
+}
+function drawScanlines() {
+  ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var y = 0; y < 320; y += 3) { ctx.moveTo(0, y); ctx.lineTo(arenaW(), y); }
+  ctx.stroke();
+}
+var vignetteCanvas = null;
+function buildVignette() {
+  try {
+    var vig = document.createElement('canvas');
+    if (!vig || !vig.getContext) return;
+    vig.width = 500; vig.height = 320;
+    var vctx = vig.getContext('2d');
+    if (!vctx || !vctx.createRadialGradient) return;
+    var g = vctx.createRadialGradient(250, 160, 120, 250, 160, 320);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,.45)');
+    vctx.fillStyle = g;
+    vctx.fillRect(0, 0, 500, 320);
+    vignetteCanvas = vig;
+  } catch (e) { vignetteCanvas = null; }
+}
+// glitch (deep-terminal) + tear (glitch void) timers — hashed cadence, brief bursts
+var glitchUntil = 0, glitchNext = 0, tearUntil = 0, tearNext = 0, glitchActive = false, tearActive = false;
+function updateThemeFx() {
+  var now = Date.now();
+  if (S.theme === 'deep-terminal') {
+    if (!glitchNext) glitchNext = now + 6000 + Math.random() * 8000;
+    if (now >= glitchNext) { glitchUntil = now + 120; glitchNext = now + 6000 + Math.random() * 8000; }
+    glitchActive = now < glitchUntil;
+  } else glitchActive = false;
+  if (S.theme === 'void') {
+    if (!tearNext) tearNext = now + 4000 + Math.random() * 5000;
+    if (now >= tearNext) { tearUntil = now + 150; tearNext = now + 4000 + Math.random() * 5000; }
+    tearActive = now < tearUntil;
+  } else tearActive = false;
+}
+function corruptionLevel() {
+  if (isBossStage()) return 0.55;
+  if (S.ghostDone) return 0.18;
+  return Math.min(0.55, 0.12 + S.arcStep * 0.10);
+}
 // faint floor decals for the chunks currently in view — pure texture, no gameplay
-function drawChunkDecals() {
+function drawGlyphDecals(color, aMin, aMax) {
   var CS = 250;
   var x0 = Math.floor(cam.x / CS), x1 = Math.floor((cam.x + arenaW()) / CS);
   var y0 = Math.floor(cam.y / CS), y1 = Math.floor((cam.y + arenaH()) / CS);
-  ctx.fillStyle = '#00e5ff';
+  ctx.fillStyle = color;
   ctx.font = '12px monospace';
   for (var cx = x0; cx <= x1; cx++) {
     for (var cy = y0; cy <= y1; cy++) {
       for (var k = 0; k < 3; k++) {
         var r1 = hash2(cx * 3 + k, cy * 7 + k), r2 = hash2(cx * 5 + k + 11, cy * 3 + k);
-        var gx = cx * CS + 20 + r1 * (CS - 40), gy = cy * CS + 20 + r2 * (CS - 40);
-        ctx.globalAlpha = 0.10 + r1 * 0.10;
-        ctx.fillText(DECAL_GLYPHS[Math.floor(r2 * DECAL_GLYPHS.length) % DECAL_GLYPHS.length], gx, gy);
+        ctx.globalAlpha = aMin + r1 * (aMax - aMin);
+        ctx.fillText(DECAL_GLYPHS[Math.floor(r2 * DECAL_GLYPHS.length) % DECAL_GLYPHS.length], cx * CS + 20 + r1 * (CS - 40), cy * CS + 20 + r2 * (CS - 40));
       }
     }
   }
   ctx.globalAlpha = 1;
 }
+var NEON_SIGNS = ['RAMEN', 'DATA', '24H', 'HOTEL', 'BAR', 'NOODLE'];
+function drawNeonSigns() {
+  var CS = 250;
+  var x0 = Math.floor(cam.x / CS), x1 = Math.floor((cam.x + arenaW()) / CS);
+  var y0 = Math.floor(cam.y / CS), y1 = Math.floor((cam.y + arenaH()) / CS);
+  ctx.font = '10px monospace'; ctx.textAlign = 'center';
+  for (var cx = x0; cx <= x1; cx++) {
+    for (var cy = y0; cy <= y1; cy++) {
+      if (hash2(cx, cy) >= 0.35) continue;
+      var col = hash2(cx, cy * 2 + 1) < 0.5 ? '#ff2d95' : '#00e5ff';
+      var txt = NEON_SIGNS[Math.floor(hash2(cx * 3, cy) * NEON_SIGNS.length) % NEON_SIGNS.length];
+      var sx = cx * CS + 30 + hash2(cx * 5, cy) * 150, sy = cy * CS + 40 + hash2(cx, cy * 5) * 150;
+      ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.shadowColor = col; ctx.shadowBlur = 8;
+      ctx.strokeRect(sx - 26, sy - 12, 52, 20);
+      ctx.shadowBlur = 0; ctx.fillStyle = col;
+      ctx.fillText(txt, sx, sy + 3);
+    }
+  }
+  ctx.textAlign = 'left'; ctx.lineWidth = 1;
+}
+function drawVectorDecals() {
+  var CS = 250;
+  var x0 = Math.floor(cam.x / CS), x1 = Math.floor((cam.x + arenaW()) / CS);
+  var y0 = Math.floor(cam.y / CS), y1 = Math.floor((cam.y + arenaH()) / CS);
+  ctx.lineWidth = 1;
+  for (var cx = x0; cx <= x1; cx++) {
+    for (var cy = y0; cy <= y1; cy++) {
+      for (var k = 0; k < 3; k++) {
+        var r1 = hash2(cx * 3 + k, cy * 7 + k), r2 = hash2(cx * 5 + k + 11, cy * 3 + k);
+        var gx = cx * CS + 20 + r1 * (CS - 40), gy = cy * CS + 20 + r2 * (CS - 40);
+        var size = 6 + r1 * 8;
+        ctx.strokeStyle = (k % 2 === 0) ? '#ff2d95' : '#00e5ff';
+        ctx.globalAlpha = 0.18;
+        if (k % 3 === 0) {
+          ctx.beginPath(); ctx.moveTo(gx, gy - size); ctx.lineTo(gx + size, gy + size); ctx.lineTo(gx - size, gy + size); ctx.closePath(); ctx.stroke();
+        } else if (k % 3 === 1) {
+          ctx.beginPath(); ctx.arc(gx, gy, size, 0, Math.PI * 2); ctx.stroke();
+        } else {
+          ctx.beginPath(); ctx.moveTo(gx, gy - size); ctx.lineTo(gx + size, gy); ctx.lineTo(gx, gy + size); ctx.lineTo(gx - size, gy); ctx.closePath(); ctx.stroke();
+        }
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawCorruption() {
+  var a = AESTHETICS['void'];
+  drawGlyphDecals(a.decalColor, a.decalAlpha[0], a.decalAlpha[1]);
+  var CS = 250;
+  var x0 = Math.floor(cam.x / CS), x1 = Math.floor((cam.x + arenaW()) / CS);
+  var y0 = Math.floor(cam.y / CS), y1 = Math.floor((cam.y + arenaH()) / CS);
+  var corrupt = corruptionLevel();
+  var n = Math.floor(corrupt * 10);
+  ctx.font = '12px monospace';
+  for (var cx = x0; cx <= x1; cx++) {
+    for (var cy = y0; cy <= y1; cy++) {
+      for (var si = 0; si < n; si++) {
+        var rx = hash2(cx * 7 + si, cy * 3), ry = hash2(cx * 3, cy * 7 + si);
+        var sx = cx * CS + 10 + rx * 220, sy = cy * CS + 10 + ry * 220;
+        var sw = 6 + hash2(cx + si, cy) * 14, sh = 3 + hash2(cx, cy + si) * 5;
+        ctx.globalAlpha = 0.25;
+        ctx.fillStyle = hash2(cx * 11 + si, cy * 5) < 0.5 ? '#ff2d95' : '#818cf8';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.globalAlpha = 0.30; ctx.fillStyle = '#ff2d95';
+        ctx.fillText(DECAL_GLYPHS[Math.floor(hash2(cx, cy + si) * DECAL_GLYPHS.length) % DECAL_GLYPHS.length], sx + hash2(cx, cy + si * 3) * 8, sy + 8);
+      }
+      if (S.arcStep >= 1 && hash2(cx, cy) < 0.08) {
+        ctx.globalAlpha = 0.10; ctx.fillStyle = '#818cf8'; ctx.font = '9px monospace';
+        ctx.fillText(hash2(cx * 3, cy) < 0.5 ? 'VEX' : 'VX-0117', cx * CS + 30 + hash2(cx * 7, cy) * 180, cy * CS + 30 + hash2(cx, cy * 7) * 180);
+        ctx.font = '12px monospace';
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+function drawThemeDecals() {
+  if (S.theme === 'neon-city') { drawNeonSigns(); return; }
+  if (S.theme === 'synthwave') { drawVectorDecals(); return; }
+  if (S.theme === 'void') { drawCorruption(); return; }
+  var a = AESTHETICS[S.theme] || AESTHETICS['deep-terminal'];
+  drawGlyphDecals(a.decalColor || '#00e5ff', a.decalAlpha[0], a.decalAlpha[1]);
+}
+var bgGrad = null, bgGradKey = '';
+function paintBg(paint, w, h) {
+  var key = paint.id + (paint.boss ? ':boss' : '') + ':' + w + 'x' + h;
+  if (key !== bgGradKey) {
+    bgGradKey = key;
+    var stops = paint.bg;
+    if (!stops || stops.length === 0) { bgGrad = '#000000'; }
+    else if (stops.length === 1) { bgGrad = stops[0].c; }
+    else {
+      var g = null;
+      try { g = ctx.createLinearGradient(0, 0, 0, h); } catch (e) { g = null; }
+      if (g && g.addColorStop) { stops.forEach(function (st) { g.addColorStop(st.o, st.c); }); bgGrad = g; }
+      else bgGrad = stops[0].c;
+    }
+  }
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, w, h);
+}
 function draw() {
   var w = arenaW(), h = arenaH();
-  var theme = themeFor(S.stage);
+  var sector = themeFor(S.stage);
+  var paint = canvasPaint();
+  updateThemeFx();
   // v18: endless world — camera centers on the hero, nothing boxes you in
   cam.x = hero.x - w / 2;
   cam.y = hero.y - h / 2;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = theme.bg;
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = theme.grid;
+  paintBg(paint, w, h);
+  // v19a screen-space ambience (never scrolls with the hero)
+  if (paint.id === 'neon-city') drawSkyline();
+  if (paint.id === 'synthwave') drawSun(paint.boss);
+  if (paint.id === 'neon-city') drawRain();
+  // grid — neon avenues: every line whose world coord is divisible by 100
   var gox = -(((cam.x % 25) + 25) % 25);
-  for (var gx = gox; gx < w; gx += 25) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke(); }
+  for (var gx = gox; gx < w; gx += 25) {
+    ctx.strokeStyle = (paint.avenue && Math.round(cam.x + gx) % 100 === 0) ? paint.avenue : paint.grid;
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+  }
   var goy = -(((cam.y % 25) + 25) % 25);
-  for (var gy = goy; gy < h; gy += 25) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
-  ctx.fillStyle = theme.accent;
+  for (var gy = goy; gy < h; gy += 25) {
+    ctx.strokeStyle = (paint.avenue && Math.round(cam.y + gy) % 100 === 0) ? paint.avenue : paint.grid;
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+  }
+  if (paint.id === 'synthwave') {
+    ctx.strokeStyle = 'rgba(255,45,149,.50)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 90); ctx.lineTo(w, 90); ctx.stroke(); ctx.lineWidth = 1;
+  }
+  ctx.fillStyle = paint.accent;
   ctx.font = 'bold 12px monospace';
   // v18 patch 3: stage number leads the label — it was sector-only in play
-  ctx.fillText('STAGE ' + S.stage + ' // SECTOR: ' + theme.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y), 10, 18);
+  // v19a: the label names the theme (boss stages name the firewall instead)
+  var labelX = 10 + (glitchActive ? (Math.floor(Date.now() / 30) % 2 ? 4 : -4) : 0);
+  var labelTxt = paint.boss ? ('STAGE ' + S.stage + ' // FIREWALL // RED ALERT // ' + Math.round(hero.x) + ',' + Math.round(hero.y))
+    : ('STAGE ' + S.stage + ' // ' + paint.tag + ' // SECTOR: ' + sector.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y));
+  if (paint.id === 'deep-terminal') ctx.globalAlpha = 0.92 + 0.08 * Math.sin(Date.now() / 90);
+  ctx.fillText(labelTxt, labelX, 18);
+  ctx.globalAlpha = 1;
   ctx.font = '10px monospace';
   ctx.save();
   ctx.translate(-cam.x, -cam.y);
-  drawChunkDecals();
+  drawThemeDecals();
   // world: crates, barrels, data nodes
   world.forEach(function (o) {
     if (o.kind === 'crate') {
@@ -1327,6 +1673,20 @@ drawMob(e, c);
   ctx.fillRect(hero.x - 22, hero.y + 30, Math.max(0, 44 * (S.heroHp / S.maxHp)), 6);
   ctx.globalAlpha = 1;
   ctx.restore();
+  // v19a theme overlays: CRT scanlines + vignette (deep-terminal), tear echo label (glitch void)
+  if (paint.id === 'deep-terminal') {
+    drawScanlines();
+    if (vignetteCanvas) ctx.drawImage(vignetteCanvas, 0, 0, w, h);
+  }
+  if (paint.id === 'void' && tearActive) {
+    var tearX = Math.floor(hash2(Math.floor(tearUntil / 1000), 3) * (w - 60));
+    ctx.fillStyle = 'rgba(255,45,149,.08)';
+    ctx.fillRect(tearX, 0, 20 + hash2(Math.floor(tearUntil / 1000), 7) * 40, h);
+    ctx.fillStyle = 'rgba(255,45,149,.35)';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText(labelTxt, 16, 18);
+    ctx.font = '10px monospace';
+  }
   // low-HP danger vignette
   if (S.heroHp / S.maxHp < 0.3) {
     ctx.strokeStyle = '#ff2d95';
@@ -1730,6 +2090,8 @@ if (S.level > 0 || S.stage > 1 || S.items.length > 0) {
 } else {
   log('fresh rig // level 0 NOOB — tap JACK IN when ready');
 }
+applyThemeCss();
+refreshThemeBtn();
 renderBench();
 requestAnimationFrame(loop);
 </script>
