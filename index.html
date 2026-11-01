@@ -361,6 +361,56 @@ var pickups = [];
 var bursts = [];
 var floaters = [];
 var tracers = [];
+// v19b: VFX ladder state — visuals/audio only, never combat numbers.
+// Kill-burst ring radii per weapon tier (t0..t5) and tracer lifetimes (s).
+var KILL_BURST_R = [16, 20, 26, 40, 30, 65];
+var TRACER_LIFE = [0.12, 0.15, 0.20, 0.25, 0.20, 0.30];
+var shakeMag = 0, shakeUntil = 0, lastShakeAt = 0;
+var flashAlpha = 0, flashUntil = 0, flashFrom = 0;
+var slowmoUntil = 0, slowmoEaseUntil = 0;
+var armorFlashUntil = 0;
+var lastShotSound = 0;
+// v19b: reduced motion — one check at boot; no matchMedia (harness) = false.
+var reducedMotion = (typeof matchMedia !== 'undefined') && !!matchMedia('(prefers-reduced-motion: reduce)').matches;
+function triggerShake(mag, ms) {
+  if (reducedMotion) return;
+  var now = Date.now();
+  if (now - lastShakeAt < 150) return; // cooldown: never within 150ms of the last shake
+  shakeMag = Math.min(4, mag); shakeUntil = now + ms; lastShakeAt = now;
+}
+function triggerFlash(a, ms) {
+  if (reducedMotion) return;
+  var now = Date.now();
+  flashAlpha = a; flashFrom = now; flashUntil = now + ms;
+}
+// v19b: slow-mo scale — 0.35 for exactly 400ms, then a 100ms ease back to 1.
+// Re-triggering extends the timer; the scale is never multiplied twice.
+function currentTimeScale() {
+  var now = Date.now();
+  if (reducedMotion) return 1;
+  if (now < slowmoUntil) return 0.35;
+  if (now < slowmoEaseUntil) { var f = (now - slowmoUntil) / Math.max(1, slowmoEaseUntil - slowmoUntil); return 0.35 + 0.65 * f; }
+  return 1;
+}
+function maybeSlowmo(e, via) {
+  // v19b: slow-mo ONLY on a t5 weapon boss kill — never on normal kills,
+  // nova kills, node completions, or any other tier.
+  if (reducedMotion || !e.boss || via === 'nova') return;
+  if (topWeaponTier() !== 5) return;
+  var now = Date.now();
+  slowmoUntil = now + 400; slowmoEaseUntil = now + 500;
+}
+function playShotSound(tier) {
+  var now = Date.now();
+  if (now - lastShotSound < 60) return; // max one shot sound per 60ms
+  lastShotSound = now;
+  if (tier === 0) tone(180, 0, 0.06, 'triangle', 0.10);
+  else if (tier === 1) { tone(1200, 0, 0.05, 'square', 0.06); tone(900, 0.02, 0.05, 'square', 0.05); }
+  else if (tier === 2) { tone(700, 0, 0.07, 'sawtooth', 0.08); tone(1400, 0, 0.03, 'square', 0.05); }
+  else if (tier === 3) { tone(220, 0, 0.15, 'sine', 0.12); tone(110, 0.05, 0.15, 'triangle', 0.10); }
+  else if (tier === 4) { tone(1600, 0, 0.10, 'sawtooth', 0.06); tone(800, 0, 0.08, 'sine', 0.05); }
+  else { tone(140, 0, 0.25, 'sawtooth', 0.14); tone(70, 0.05, 0.25, 'sine', 0.12); }
+}
 var banner = null;
 var keys = {};
 var joy = null; // {ox, oy, dx, dy}
@@ -535,8 +585,11 @@ function dropRoll(firstBlood, x, y) {
     log('loot dropped // ' + TIER_NAMES[tier - 1] + ' ' + type.toUpperCase() + ' — walk over it to grab it');
   }
 }
-function onKill(e) {
+function onKill(e, via) {
   AN.totals.kills += 1; if (AN.session) AN.session.kills += 1;
+  // v19b: boss death shakes + flashes regardless of tier or source;
+  // slow-mo is gated inside maybeSlowmo (t5 weapon kills only, never nova).
+  if (e.boss) { triggerShake(4, 250); triggerFlash(0.35, 250); maybeSlowmo(e, via); }
   log(e.name + ' breached // +' + (5 + S.stage) + ' crypto');
   var cryptoGain = 5 + S.stage;
   var dataGain = 8 + S.stage * 2;
@@ -997,7 +1050,7 @@ document.getElementById('injectBtn').onclick = function () {
   log((hit ? ('INJECT NOVA // hit ' + hit + ' foes') : 'INJECT NOVA // nothing in range — get closer') + (barrelHits ? (', smashed ' + barrelHits + ' barrel' + (barrelHits === 1 ? '' : 's')) : ''));
   var dead = enemies.filter(function (e) { return e.hp <= 0; });
   enemies = enemies.filter(function (e) { return e.hp > 0; });
-  dead.forEach(function (e) { onKill(e); });
+  dead.forEach(function (e) { onKill(e, 'nova'); });
   renderBench();
 };
 document.getElementById('healBtn').onclick = function () {
@@ -1270,6 +1323,7 @@ function buildVignette() {
 var glitchUntil = 0, glitchNext = 0, tearUntil = 0, tearNext = 0, glitchActive = false, tearActive = false;
 function updateThemeFx() {
   var now = Date.now();
+  if (reducedMotion) { glitchActive = false; tearActive = false; return; } // v19b: no glitch/tear bursts
   if (S.theme === 'deep-terminal') {
     if (!glitchNext) glitchNext = now + 6000 + Math.random() * 8000;
     if (now >= glitchNext) { glitchUntil = now + 120; glitchNext = now + 6000 + Math.random() * 8000; }
@@ -1445,7 +1499,10 @@ function draw() {
   ctx.globalAlpha = 1;
   ctx.font = '10px monospace';
   ctx.save();
-  ctx.translate(-cam.x, -cam.y);
+  // v19b: screen shake applies to the world section only (never labels/UI)
+  var shx = 0, shy = 0;
+  if (!reducedMotion && Date.now() < shakeUntil) { shx = (Math.random() * 2 - 1) * shakeMag; shy = (Math.random() * 2 - 1) * shakeMag; }
+  ctx.translate(-cam.x + shx, -cam.y + shy);
   drawThemeDecals();
   // world: crates, barrels, data nodes
   world.forEach(function (o) {
@@ -1490,13 +1547,67 @@ function draw() {
       ctx.lineWidth = 1;
     }
   });
-  // tracers
+  // tracers — v19b per-tier shot painters (each tracer carries its own tier)
   var wt = topWeaponTier();
-  var tracerColor = wt === 0 ? '#00ff88' : TIER_COLORS[wt - 1];
   tracers.forEach(function (t) {
-    ctx.globalAlpha = Math.max(0, t.life);
-    ctx.strokeStyle = tracerColor; ctx.lineWidth = wt >= 4 ? 4 : (wt === 3 ? 3 : 2);
-    ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+    var tt = (t.tier === undefined ? wt : t.tier);
+    var fade = Math.max(0, t.life / (t.max || 1));
+    var col = tt === 0 ? '#00ff88' : TIER_COLORS[tt - 1];
+    var dx = t.x2 - t.x1, dy = t.y2 - t.y1;
+    var dl = Math.sqrt(dx * dx + dy * dy) || 1;
+    var ux = dx / dl, uy = dy / dl, px = -uy, py = ux;
+    var beamAlpha = (t.kind === 'beam') ? 0.35 : 1; // t4 afterglow
+    ctx.globalAlpha = fade * beamAlpha;
+    if (tt === 0) {
+      // MELEE: no projectile — an 18px arc slash at the target
+      ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(t.x2, t.y2, 18, -0.6, 1.4); ctx.stroke();
+    } else if (tt === 1) {
+      // FAST: thin bolt + one echo line, alpha 0.30, offset 6px back along the path
+      ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+      ctx.globalAlpha = fade * beamAlpha * 0.30;
+      ctx.beginPath(); ctx.moveTo(t.x1 - ux * 6, t.y1 - uy * 6); ctx.lineTo(t.x2 - ux * 6, t.y2 - uy * 6); ctx.stroke();
+    } else if (tt === 2) {
+      // RIFLE: bolt with white-hot core
+      ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+    } else if (tt === 3) {
+      // SPLASH: fat plasma + impact blob + 2 trailing blobs behind the head
+      ctx.strokeStyle = '#ff2d95'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+      ctx.fillStyle = '#ff2d95';
+      ctx.beginPath(); ctx.arc(t.x2, t.y2, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = fade * beamAlpha * 0.50;
+      ctx.beginPath(); ctx.arc(t.x2 - ux * 12, t.y2 - uy * 12, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = fade * beamAlpha * 0.25;
+      ctx.beginPath(); ctx.arc(t.x2 - ux * 24, t.y2 - uy * 24, 3, 0, Math.PI * 2); ctx.fill();
+    } else if (tt === 4) {
+      // PIERCE: twin rails offset 4px, extending 30px past the target
+      ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2;
+      var ex = t.x2 + ux * 30, ey = t.y2 + uy * 30;
+      ctx.beginPath(); ctx.moveTo(t.x1 + px * 4, t.y1 + py * 4); ctx.lineTo(ex + px * 4, ey + py * 4); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(t.x1 - px * 4, t.y1 - py * 4); ctx.lineTo(ex - px * 4, ey - py * 4); ctx.stroke();
+    } else {
+      // HEAVY: fat beam + white core + 2 trailing blobs behind the head
+      ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+      ctx.fillStyle = '#fbbf24';
+      ctx.globalAlpha = fade * beamAlpha * 0.50;
+      ctx.beginPath(); ctx.arc(t.x2 - ux * 14, t.y2 - uy * 14, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = fade * beamAlpha * 0.25;
+      ctx.beginPath(); ctx.arc(t.x2 - ux * 28, t.y2 - uy * 28, 4, 0, Math.PI * 2); ctx.fill();
+    }
+    // v19a synthwave rule: every line tracer gets a white-hot core
+    if (paint.id === 'synthwave' && tt !== 0 && tt !== 2 && tt !== 5) {
+      ctx.globalAlpha = fade * beamAlpha;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(t.x1, t.y1); ctx.lineTo(t.x2, t.y2); ctx.stroke();
+    }
     ctx.globalAlpha = 1; ctx.lineWidth = 1;
   });
   // enemies — shape + color = type, size = power
@@ -1538,8 +1649,21 @@ drawMob(e, c);
   });
   bursts.forEach(function (b) {
     var t = 1 - b.life / b.max;
+    var R = b.R || 38; // v19b: kill/impact rings expand 8 -> R (legacy bursts keep 38)
     ctx.strokeStyle = b.color; ctx.globalAlpha = 1 - t;
-    ctx.beginPath(); ctx.arc(b.x, b.y, 8 + t * 30, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(b.x, b.y, 8 + t * (R - 8), 0, Math.PI * 2); ctx.stroke();
+    if (b.sparks) { // v19b: t0/t2 spark lines radiating from the target
+      for (var si = 0; si < b.sparks; si++) {
+        var sa = hash2(Math.floor(b.x), Math.floor(b.y) + si * 7) * Math.PI * 2;
+        ctx.beginPath(); ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x + Math.cos(sa) * (10 + 6 * (1 - t)), b.y + Math.sin(sa) * (10 + 6 * (1 - t))); ctx.stroke();
+      }
+    }
+    if (b.mark) { // v19b: t4 line-through mark across the target, along the shot
+      var ma = b.ang || 0;
+      ctx.beginPath(); ctx.moveTo(b.x - Math.cos(ma) * R, b.y - Math.sin(ma) * R);
+      ctx.lineTo(b.x + Math.cos(ma) * R, b.y + Math.sin(ma) * R); ctx.stroke();
+    }
     ctx.globalAlpha = 1;
   });
   // hero rig — visuals show exactly what you are using
@@ -1553,32 +1677,48 @@ drawMob(e, c);
     ctx.strokeStyle = '#00e5ff'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 38, 0, Math.PI * 2); ctx.stroke();
   }
-  // armor shell by top armor tier
+  // armor shell by top armor tier — v19b: pulse, shards, aura, hit flash
   var at = topArmorTier();
+  var armorFlash = Date.now() < armorFlashUntil; // white rings for 100ms after a hit
   if (at === 1) {
-    ctx.strokeStyle = '#00ff88'; ctx.lineWidth = 2;
+    ctx.strokeStyle = armorFlash ? '#ffffff' : '#00ff88'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 28, 0, Math.PI * 2); ctx.stroke();
   } else if (at === 2) {
     ctx.fillStyle = '#00e5ff';
     ctx.fillRect(hero.x - 24, hero.y - 16, 6, 36);
     ctx.fillRect(hero.x + 18, hero.y - 16, 6, 36);
   } else if (at === 3) {
-    ctx.strokeStyle = '#ff2d95'; ctx.lineWidth = 3;
-    ctx.shadowColor = '#ff2d95'; ctx.shadowBlur = 12;
-    ctx.beginPath(); ctx.arc(hero.x, hero.y, 30, 0, Math.PI * 2); ctx.stroke();
+    // breathing shield: radius pulses 30 +/- 1.5px
+    var pr = 30 + 1.5 * Math.sin(Date.now() / 250);
+    ctx.strokeStyle = armorFlash ? '#ffffff' : '#ff2d95'; ctx.lineWidth = 3;
+    ctx.shadowColor = armorFlash ? '#ffffff' : '#ff2d95'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(hero.x, hero.y, pr, 0, Math.PI * 2); ctx.stroke();
     ctx.shadowBlur = 0;
   } else if (at === 4) {
-    ctx.strokeStyle = '#a78bfa'; ctx.lineWidth = 2;
+    ctx.strokeStyle = armorFlash ? '#ffffff' : '#a78bfa'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 28, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 33, 0, Math.PI * 2); ctx.stroke();
+    // 4 orbiting shield shards: 4px diamonds at r33, 90 degrees apart
+    ctx.fillStyle = '#a78bfa';
+    for (var sk = 0; sk < 4; sk++) {
+      var sang = Date.now() / 400 + sk * Math.PI / 2;
+      var sx = hero.x + Math.cos(sang) * 33, sy = hero.y + Math.sin(sang) * 33;
+      ctx.beginPath(); ctx.moveTo(sx, sy - 4); ctx.lineTo(sx + 4, sy); ctx.lineTo(sx, sy + 4); ctx.lineTo(sx - 4, sy); ctx.closePath(); ctx.fill();
+    }
   } else if (at === 5) {
-    ctx.strokeStyle = '#fbbf24'; ctx.lineWidth = 3;
-    ctx.shadowColor = '#fbbf24'; ctx.shadowBlur = 12;
+    // gold aura underlay (alpha rings, no glow) + gold ring + rotating dashed ring
+    ctx.strokeStyle = 'rgba(251,191,36,.12)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(hero.x, hero.y, 40, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(251,191,36,.06)';
+    ctx.beginPath(); ctx.arc(hero.x, hero.y, 48, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = armorFlash ? '#ffffff' : '#fbbf24'; ctx.lineWidth = 3;
+    ctx.shadowColor = armorFlash ? '#ffffff' : '#fbbf24'; ctx.shadowBlur = 12;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 30, 0, Math.PI * 2); ctx.stroke();
     ctx.shadowBlur = 0;
     ctx.setLineDash([6, 6]);
+    ctx.lineDashOffset = -Date.now() / 50;
     ctx.beginPath(); ctx.arc(hero.x, hero.y, 35, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
   }
   // MUSE: headphones on, two fingers chugging away at the netbook
   var wc = wt === 0 ? '#00ff88' : TIER_COLORS[wt - 1];
@@ -1673,6 +1813,12 @@ drawMob(e, c);
   ctx.fillRect(hero.x - 22, hero.y + 30, Math.max(0, 44 * (S.heroHp / S.maxHp)), 6);
   ctx.globalAlpha = 1;
   ctx.restore();
+  // v19b: screen flash — after the world section, before UI, decaying linearly
+  if (!reducedMotion && Date.now() < flashUntil) {
+    var ff = Math.max(0, (flashUntil - Date.now()) / Math.max(1, flashUntil - flashFrom));
+    ctx.fillStyle = 'rgba(255,255,255,' + (flashAlpha * ff) + ')';
+    ctx.fillRect(0, 0, w, h);
+  }
   // v19a theme overlays: CRT scanlines + vignette (deep-terminal), tear echo label (glitch void)
   if (paint.id === 'deep-terminal') {
     drawScanlines();
@@ -1924,14 +2070,29 @@ function update(dt, ts) {
         var kdx = e.x - hero.x, kdy = e.y - hero.y, kd = Math.sqrt(kdx * kdx + kdy * kdy) || 1;
         var kb = e.boss ? 18 : 70;
         e.kx += kdx / kd * kb; e.ky += kdy / kd * kb;
-        floaters.push({ x: e.x, y: e.y - e.r - 8, txt: '-' + dd, color: '#00ff88', life: 1 });
+        // v19b: the killing blow's floater wears the killer's tier color
+        var kc = topWeaponTier() === 0 ? '#00ff88' : TIER_COLORS[topWeaponTier() - 1];
+        floaters.push({ x: e.x, y: e.y - e.r - 8, txt: '-' + dd, color: (e.hp <= 0) ? kc : '#00ff88', life: 1 });
       });
-      tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: 1 });
-      if (ws.splash > 0) bursts.push({ x: t.x, y: t.y, life: 0.4, max: 0.4, color: topWeaponTier() === 0 ? '#00ff88' : TIER_COLORS[topWeaponTier() - 1] });
+      // v19b: tiered shot — tracer carries its tier + life; t4 adds a beam afterglow
+      var ft = topWeaponTier();
+      tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: TRACER_LIFE[ft], max: TRACER_LIFE[ft], tier: ft, kind: 'shot' });
+      if (ft === 4) tracers.push({ x1: hero.x, y1: hero.y + 18, x2: t.x, y2: t.y, life: 0.20, max: 0.20, tier: 4, kind: 'beam' });
+      playShotSound(ft);
+      if (ft === 3) triggerShake(2, 120);
+      if (ft === 5) { triggerShake(4, 180); triggerFlash(0.22, 150); }
+      if (ws.splash > 0) bursts.push({ x: t.x, y: t.y, life: 0.4, max: 0.4, color: topWeaponTier() === 0 ? '#00ff88' : TIER_COLORS[topWeaponTier() - 1], R: ws.splash });
       lastFire = ts;
       var dead = enemies.filter(function (e) { return e.hp <= 0; });
       enemies = enemies.filter(function (e) { return e.hp > 0; });
-      dead.forEach(function (e) { onKill(e); });
+      dead.forEach(function (e) {
+        // v19b: kill burst ring per tier (splash weapons already burst at impact)
+        var kt = topWeaponTier();
+        if (!(ws.splash > 0)) {
+          bursts.push({ x: e.x, y: e.y, life: 0.5, max: 0.5, color: kt === 0 ? '#00ff88' : TIER_COLORS[kt - 1], R: KILL_BURST_R[kt], sparks: (kt === 0 || kt === 2) ? 3 : 0, mark: kt === 4, ang: Math.atan2(e.y - (hero.y + 18), e.x - hero.x) });
+        }
+        onKill(e);
+      });
     }
   }
   // SPACE fires Inject Nova (same as the button; typing in an input never triggers it)
@@ -1989,6 +2150,7 @@ function update(dt, ts) {
       var dmg = Math.max(1, e.dmg - armorBonus());
       S.heroHp -= dmg;
       e.hitCd = 0.9;
+      armorFlashUntil = Date.now() + 100; // v19b: armor rings flash white for 100ms
       floaters.push({ x: hero.x, y: hero.y - 24, txt: '-' + dmg, color: '#ff2d95', life: 1 });
       hero.vx += hdx / hd * 220;
       hero.vy += hdy / hd * 220;
@@ -2054,7 +2216,7 @@ function update(dt, ts) {
   }
   floaters.forEach(function (f) { f.y -= 0.6; f.life -= 0.012; });
   floaters = floaters.filter(function (f) { return f.life > 0; });
-  tracers.forEach(function (t) { t.life -= 0.08; });
+  tracers.forEach(function (t) { t.life -= dt; }); // v19b: tracer life is seconds, per tier
   tracers = tracers.filter(function (t) { return t.life > 0; });
   if (banner) { banner.life -= dt; if (banner.life <= 0) banner = null; }
   if (sectorFade > 0) sectorFade = Math.max(0, sectorFade - dt * 1.6);
@@ -2062,7 +2224,7 @@ function update(dt, ts) {
 }
 function loop(ts) {
   if (!lastTime) lastTime = ts;
-  var dt = Math.min(0.05, (ts - lastTime) / 1000);
+  var dt = Math.min(0.05, (ts - lastTime) / 1000) * currentTimeScale(); // v19b: slow-mo scales dt only
   lastTime = ts;
   update(dt, ts);
   renderStats();
