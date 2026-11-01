@@ -1094,8 +1094,10 @@ function draw() {
   var goy = -(((cam.y % 25) + 25) % 25);
   for (var gy = goy; gy < h; gy += 25) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke(); }
   ctx.fillStyle = theme.accent;
+  ctx.font = 'bold 12px monospace';
+  // v18 patch 3: stage number leads the label — it was sector-only in play
+  ctx.fillText('STAGE ' + S.stage + ' // SECTOR: ' + theme.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y), 10, 18);
   ctx.font = '10px monospace';
-  ctx.fillText('SECTOR: ' + theme.name + ' // ' + Math.round(hero.x) + ',' + Math.round(hero.y), 10, 18);
   ctx.save();
   ctx.translate(-cam.x, -cam.y);
   drawChunkDecals();
