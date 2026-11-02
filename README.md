@@ -7,12 +7,12 @@ commands.
 
 ## ▶️ Play now — one tap
 
-**Latest: v21.1**
+**Latest: v21.2**
 
-[Play XPLOIT HERO v21.1](https://loganbek.github.io/xploit-hero/?v=21.1)
+[Play XPLOIT HERO v21.2](https://loganbek.github.io/xploit-hero/?v=21.2)
 
 Opens the latest build right in your browser — no install, no account.
-Your save carries over. The `?v=21.1` on the link busts the browser cache
+Your save carries over. The `?v=21.2` on the link busts the browser cache
 and tells you which version you're opening — if the game itself still
 shows an older version, that link is stale and needs updating on the
 next release.
@@ -41,7 +41,7 @@ account, no server. Your progress saves in the browser's local storage.
 
 ## Roadmap
 
-- Live now (v21.1, the 70-tier finale + minimap polish): the gear
+- Live now (v21.2, the 70-tier finale + collapsed crafting panel): the gear
   ladder grows to ~70 tiers ("laughably large"), with stage-scaled
   drops so high stages drop high tiers directly, affix slots/caps
   scaling by tier band, gold ★★★ nameplates, three gear sets

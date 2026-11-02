@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>XPLOIT HERO — POC v21.1</title>
+<title>XPLOIT HERO — POC v21.2</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { margin: 0; background: var(--body-bg, #020805); color: var(--ink, #00ff88); font-family: ui-monospace, Menlo, Consolas, monospace; --body-bg: #020805; --ink: #00ff88; --dim: #4ade80; --accent: #00ff88; --accent2: #00e5ff; --panel-bg: #03130a; --border: #14532d; --btn-bg: #052e1a; --obj-bg: #220614; --glow: rgba(0,255,136,.25); }
@@ -59,7 +59,7 @@
 <body>
 <div id="wrap">
   <h1>XPLOIT <span>HERO</span></h1>
-  <div id="sub">POC v21.1 // minimap — minimal, bottom-right, transparent</div>
+  <div id="sub">POC v21.2 // crafting panel collapsed by default — play screen stays clean</div>
   <div id="stagebox">
     <canvas id="cv" width="500" height="320"></canvas>
     <div id="intro">
@@ -95,7 +95,7 @@
   </div>
   <div id="objective">GOAL: <b id="objText">jack in to start</b></div>
   <div class="panel">
-    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span><span>VER <b id="verLabel">v21</b></span></div>
+    <div class="row"><span><b id="rank" class="cyan">NOOB</b> // LVL <b id="lvl">0</b></span><span>STAGE <b id="stage">1</b></span><span>VER <b id="verLabel">v21.2</b></span></div>
     <div class="row"><span>ATK <b id="atk">6</b> <span class="dim" id="atkBreak"></span></span><span>ARMOR <b id="armor">0</b></span></div>
     <div class="row"><span>DATA <b id="data">0</b>/<span id="dataNext">30</span></span><span>CRYPTO <b id="crypto" class="cyan">0</b></span></div>
     <div class="row"><span>HP <b id="heroHp">60/60</b></span><span>FOES <b id="foeCount">0</b></span></div>
@@ -117,7 +117,8 @@
     <div id="invBox" style="display:none;font-size:12px;margin-top:8px;"></div>
   </div>
   <div class="panel">
-    <div class="row"><span>CRAFTING // paragon / prestige — Data is the currency, nothing here costs crypto</span></div>
+    <div class="row"><span>CRAFTING // paragon / prestige — Data is the currency, nothing here costs crypto</span><span><button id="craftToggleBtn">SHOW CRAFTING</button></span></div>
+    <div id="craftBody" style="display:none;">
     <div id="craftInfo" class="dim" style="font-size:12px;margin-top:8px;white-space:pre-wrap;"></div>
     <div id="btns" style="grid-template-columns:1fr 1fr 1fr;">
       <button id="rerollWBtn">REROLL WEAPON</button>
@@ -132,6 +133,7 @@
       <button id="paraSwfBtn">PARAGON SWF +1</button>
       <button id="paraRespecBtn">PARAGON RESPEC</button>
       <button id="prestigeBtn">PRESTIGE</button>
+    </div>
     </div>
   </div>
   <div class="panel">
@@ -548,7 +550,7 @@ function mobPoolFor(stage) {
   return [ENEMIES[stage % 6], ENEMIES[(stage + 2) % 6], ENEMIES[(stage + 4) % 6]];
 }
 var SAVE_KEY = 'xploit-hero-poc-v2';
-var GAME_VERSION = 'v21.1'; // v21.1: minimap polish only — minimal, bottom-right, transparent; save key never changes with it.
+var GAME_VERSION = 'v21.2'; // v21.2: crafting panel collapsed by default (one SHOW CRAFTING button, body hidden until tapped); save key never changes with it.
 var RANKS = [[0, 'NOOB'], [1, 'SCRIPT KIDDIE'], [3, 'PHREAKER'], [5, 'CRACKER'], [8, 'HACKER'], [11, 'BLACK HAT'], [15, 'ZERO-DAY HUNTER'], [20, 'ELITE HAXZOR'], [25, 'GHOST IN THE MACHINE'], [30, 'ZERO-DAY LEGEND'], [40, 'MAINFRAME MYTH'], [50, 'SINGULARITY']]; // v21d: paragon ranks (v20 §5.1)
 var KILLS_PER_STAGE = 5;
 var AC = null;
@@ -1770,6 +1772,13 @@ document.getElementById('invBtn').onclick = function () {
   box.style.display = show ? 'block' : 'none';
   document.getElementById('invBtn').textContent = show ? 'HIDE INVENTORY' : 'SHOW INVENTORY';
   if (show) { lastInvKey = ''; renderInventory(); }
+};
+// v21.2: crafting panel collapsed by default — the wall of buttons is one tap away, never in the way while playing.
+document.getElementById('craftToggleBtn').onclick = function () {
+  var body = document.getElementById('craftBody');
+  var show = body.style.display === 'none';
+  body.style.display = show ? 'block' : 'none';
+  document.getElementById('craftToggleBtn').textContent = show ? 'HIDE CRAFTING' : 'SHOW CRAFTING';
 };
 document.getElementById('statsBtn').onclick = function () {
   var sb = document.getElementById('statsBox');
